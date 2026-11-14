@@ -1,0 +1,548 @@
+<title>スイングラボ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+/* Layout: 練習場のヤーデージブック。左に動画ステージ、右に P-ポジション別の数値と診断、下に時系列の小さなグラフ3枚 */
+:root{
+  --bg:#F1F4EE; --surface:#FFFFFF; --ink:#16201A; --muted:#5A675E; --line:#D8DFD4;
+  --accent:#2F7A4D; --accent-2:#B8790A; --accent-soft:#E2EEE4;
+  --good:#2E7D4F; --warn:#A86400; --bad:#B8362A;
+  --stage:#0E1410; --stage-ink:#E9F0EA;
+  --f-display:"Barlow Condensed","Noto Sans JP",system-ui,sans-serif;
+  --f-body:"Noto Sans JP","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1411; --surface:#161D18; --ink:#E6ECE7; --muted:#93A198; --line:#27322B;
+  --accent:#3E9C68; --accent-2:#BD7A1C; --accent-soft:#1C2A21;
+  --good:#4FAE78; --warn:#D9952B; --bad:#E0675A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1411; --surface:#161D18; --ink:#E6ECE7; --muted:#93A198; --line:#27322B;
+  --accent:#3E9C68; --accent-2:#BD7A1C; --accent-soft:#1C2A21;
+  --good:#4FAE78; --warn:#D9952B; --bad:#E0675A; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
+.wrap{max-width:1240px;margin:0 auto}
+header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;padding-block:18px 14px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:12px}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:30px;letter-spacing:.02em;margin:0;line-height:1}
+.brand h1 b{color:var(--accent)}
+.brand span{color:var(--muted);font-size:12.5px}
+.settings{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.field{display:flex;flex-direction:column;gap:2px}
+.field label{font-size:11px;color:var(--muted);letter-spacing:.06em}
+select,input[type=number]{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:5px 8px;min-height:34px}
+input[type=number]{width:76px}
+.btn{font:inherit;font-weight:700;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:36px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.08)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.notice{margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--accent-soft);border-radius:8px;padding:9px 14px;font-size:13px}
+.notice strong{color:var(--accent)}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:22px;margin-top:18px;align-items:start}
+@media (max-width:960px){.grid{grid-template-columns:minmax(0,1fr)}}
+.stage-col{display:flex;flex-direction:column;gap:10px;min-width:0}
+.stage{position:relative;background:var(--stage);border-radius:var(--r);overflow:hidden;display:flex;justify-content:center;align-items:center;min-height:240px}
+.stage .box{position:relative;max-width:100%}
+.stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage.drag{outline:3px dashed var(--accent);outline-offset:-6px}
+.busy[hidden]{display:none}
+.busy{position:absolute;inset:0;background:rgba(10,15,12,.78);color:var(--stage-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:20px;z-index:3}
+.bar{width:min(280px,80%);height:6px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:#5BC487;transition:width .15s}
+.transport{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.transport input[type=range]{flex:1 1 180px;accent-color:var(--accent);min-width:0}
+.time{font-family:var(--f-display);font-size:17px;font-variant-numeric:tabular-nums;min-width:96px;text-align:right;color:var(--muted)}
+.icon-btn{width:38px;justify-content:center;padding:0}
+.phases{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.phase{font:inherit;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 10px;cursor:pointer;color:var(--ink);min-width:0}
+.phase b{font-family:var(--f-display);font-size:18px;display:block;line-height:1.1}
+.phase span{font-size:11.5px;color:var(--muted)}
+.phase.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.toggles{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted)}
+.toggles label{display:flex;gap:5px;align-items:center;cursor:pointer}
+.toggles input{accent-color:var(--accent)}
+.panel{display:flex;flex-direction:column;gap:18px;min-width:0}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+@media (max-width:520px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);padding:12px 14px;min-width:0}
+.kpi .k{font-size:11.5px;color:var(--muted);letter-spacing:.04em}
+.kpi .v{font-family:var(--f-display);font-weight:700;font-size:32px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .v small{font-size:15px;font-weight:600;color:var(--muted);margin-left:2px}
+.kpi .s{font-size:11.5px;color:var(--muted)}
+h2{font-family:var(--f-display);font-size:19px;font-weight:700;letter-spacing:.03em;margin:0 0 8px;text-wrap:balance;display:flex;align-items:baseline;gap:10px}
+h2 small{font-family:var(--f-body);font-size:11.5px;font-weight:400;color:var(--muted)}
+.tbl-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{font-size:11px;color:var(--muted);font-weight:500;letter-spacing:.05em}
+thead th b{font-family:var(--f-display);font-size:15px;color:var(--ink);margin-right:3px}
+tbody tr:last-child td{border-bottom:0}
+td.num{font-family:var(--f-display);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-body);font-weight:400}
+.diag{display:flex;flex-direction:column;gap:8px;list-style:none;margin:0;padding:0}
+.diag li button{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 12px;align-items:start;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+.diag li button:hover{border-color:var(--accent)}
+.diag li button:focus-visible{outline:2px solid var(--accent)}
+.pill{font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 9px 2px 7px;display:inline-flex;gap:4px;align-items:center;white-space:nowrap;border:1px solid currentColor}
+.pill.good{color:var(--good)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)}
+.diag .t{font-weight:700}
+.diag .d{grid-column:2/4;color:var(--muted);font-size:12.5px}
+.diag .go{font-family:var(--f-display);font-size:14px;color:var(--accent);white-space:nowrap}
+.charts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:26px}
+@media (max-width:960px){.charts{grid-template-columns:minmax(0,1fr)}}
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 12px 8px;position:relative;min-width:0}
+.chart h3{font-size:13.5px;margin:0;font-weight:700}
+.legend{display:flex;gap:12px;font-size:11.5px;color:var(--muted);margin-top:2px;min-height:18px}
+.legend i{display:inline-block;width:16px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
+.legend i.dash{border-top-style:dashed}
+.chart canvas{width:100%;height:170px;display:block;margin-top:4px;touch-action:none;cursor:crosshair}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:5px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-100%);z-index:2}
+.tip b{font-family:var(--f-display);font-size:14px}
+.howto{margin-top:26px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;border-top:1px solid var(--line);padding-top:18px}
+@media (max-width:760px){.howto{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.howto div{min-width:0;font-size:12.5px;color:var(--muted)}
+.howto b{display:block;color:var(--ink);font-size:13px;margin-bottom:2px}
+.err{color:var(--bad);font-weight:700}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="brand"><h1>SWING<b>LAB</b></h1><span>ゴルフスイング動作解析</span></div>
+  <div class="settings">
+    <div class="field"><label for="hand">利き手</label><select id="hand"><option value="R">右打ち</option><option value="L">左打ち</option></select></div>
+    <div class="field"><label for="view">撮影方向</label><select id="view"><option value="face">正面（フェースオン）</option><option value="dtl">後方（飛球線後方）</option></select></div>
+    <div class="field"><label for="height">身長 cm</label><input id="height" type="number" min="120" max="210" value="170"></div>
+    <div class="field"><label for="slow">動画速度</label><select id="slow"><option value="1">通常</option><option value="4">スロー 1/4</option><option value="8">スロー 1/8</option></select></div>
+    <label class="btn primary" for="file">動画を選ぶ</label>
+    <input id="file" type="file" accept="video/*" hidden>
+  </div>
+</header>
+
+<div class="notice" id="notice"><strong>サンプル表示中</strong><span id="noticeText">合成したスイングデータで画面の見方を示しています。自分のスイング動画を選ぶと、ブラウザ内で骨格を検出して解析します（動画は外部に送信されません）。</span></div>
+
+<div class="grid">
+  <section class="stage-col" aria-label="動画">
+    <div class="stage" id="stage">
+      <div class="box" id="box">
+        <video id="video" muted playsinline preload="auto"></video>
+        <canvas id="overlay"></canvas>
+      </div>
+      <div class="busy" id="busy" hidden><div id="busyText">準備中…</div><div class="bar"><i id="busyBar"></i></div></div>
+    </div>
+    <div class="transport">
+      <button class="btn icon-btn" id="prev" aria-label="1コマ戻る">◀︎</button>
+      <button class="btn" id="play" style="min-width:74px;justify-content:center">再生</button>
+      <button class="btn icon-btn" id="next" aria-label="1コマ進む">▶︎</button>
+      <input type="range" id="scrub" min="0" max="0" value="0" aria-label="フレーム位置">
+      <select id="rate" aria-label="再生速度"><option value="0.25">0.25×</option><option value="0.5" selected>0.5×</option><option value="1">1×</option></select>
+      <span class="time" id="time">0.00 s</span>
+    </div>
+    <div class="phases" id="phases"></div>
+    <div class="toggles">
+      <label><input type="checkbox" id="tSkel" checked>骨格</label>
+      <label><input type="checkbox" id="tPath" checked>手の軌道</label>
+      <label><input type="checkbox" id="tHead" checked>頭の基準円</label>
+      <label><input type="checkbox" id="tSpine" checked>アドレス時の軸</label>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="解析結果">
+    <div class="kpis" id="kpis"></div>
+    <div>
+      <h2>ポジション別の数値 <small id="viewNote"></small></h2>
+      <div class="tbl-wrap"><table id="tbl"></table></div>
+    </div>
+    <div>
+      <h2>診断 <small>タップでその瞬間へ移動</small></h2>
+      <ul class="diag" id="diag"></ul>
+    </div>
+  </section>
+</div>
+
+<section class="charts" id="charts" aria-label="時系列グラフ"></section>
+
+<section class="howto" aria-label="撮影のコツ">
+  <div><b>全身を入れる</b>頭から足先、クラブの振り上げまで画面に収まる距離で撮影します。</div>
+  <div><b>カメラを固定</b>三脚などで固定し、手の高さ（腰〜胸）から撮ると角度が安定します。</div>
+  <div><b>方向をそろえる</b>正面は体の正面から、後方は飛球線の真後ろから。上の「撮影方向」も合わせます。</div>
+  <div><b>明るく、短く</b>明るい場所で、アドレスからフィニッシュまで10秒以内の動画が最適です。</div>
+</section>
+</div>
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const VISION_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
+const WASM_LOADER = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/vision_wasm_internal.js';
+const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+const JOINTS = [0,11,12,13,14,15,16,23,24,25,26,27,28];
+const FPS = 30;
+
+const S = { frames:[], W:720, H:960, source:'sample', i:0, playing:false, A:null, lastTs:0, simT:0 };
+
+/* ---------- math ---------- */
+const mid = (a,b) => [(a[0]+b[0])/2,(a[1]+b[1])/2];
+const dist = (a,b) => Math.hypot(a[0]-b[0],a[1]-b[1]);
+const deg = r => r*180/Math.PI;
+function angleAt(a,b,c){const v1=[a[0]-b[0],a[1]-b[1]],v2=[c[0]-b[0],c[1]-b[1]];const d=(v1[0]*v2[0]+v1[1]*v2[1])/(Math.hypot(...v1)*Math.hypot(...v2)||1);return deg(Math.acos(Math.max(-1,Math.min(1,d))));}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ease=u=>u<.5?2*u*u:1-2*(1-u)*(1-u);
+
+/* ---------- synthetic sample (right-handed, face-on) ---------- */
+function makeSample(){
+  const W=720,H=960,T=3.2, t0=.6,t1=1.5,t2=1.8,t3=2.45; let seed=7;
+  const rnd=()=>{seed=(seed*16807)%2147483647;return (seed/2147483647-.5)*2.2};
+  const ik=(Sh,Hd,L1,L2,preferLow)=>{const d=Math.min(dist(Sh,Hd),L1+L2-.01);const a=(L1*L1-L2*L2+d*d)/(2*d);const h=Math.sqrt(Math.max(0,L1*L1-a*a));const dx=(Hd[0]-Sh[0])/dist(Sh,Hd),dy=(Hd[1]-Sh[1])/dist(Sh,Hd);const P=[Sh[0]+a*dx,Sh[1]+a*dy];const e1=[P[0]-h*dy,P[1]+h*dx],e2=[P[0]+h*dy,P[1]-h*dx];return (e1[1]>e2[1])===preferLow?e1:e2;};
+  const frames=[];
+  for(let i=0;i<=T*FPS;i++){
+    const t=i/FPS; let a,ts,th,shift;
+    if(t<t0){a=0;ts=0;th=0;shift=0}
+    else if(t<t1){const u=ease((t-t0)/(t1-t0));a=2.45*u;ts=88*u;th=42*u;shift=-10*u}
+    else if(t<t2){const u=(t-t1)/(t2-t1);a=2.45*(1-u*u);ts=88-113*u*u;th=42-82*Math.pow(u,1.4);shift=-10+28*u}
+    else if(t<t3){const u=(t-t2)/(t3-t2),e=1-(1-u)*(1-u);a=-2.7*e;ts=-25-75*e;th=-40-45*e;shift=18+14*e}
+    else{a=-2.7;ts=-100;th=-85;shift=32}
+    const r=x=>x*Math.PI/180;
+    const hc=[360+shift,612], sc=[358+shift*.35,420];
+    const hw=95*Math.abs(Math.cos(r(th))), sw=150*Math.abs(Math.cos(r(ts)));
+    const tilt=20*Math.sin(r(ts));
+    const L=Array.from({length:33},()=>[0,0,1]);
+    const set=(k,p)=>{L[k]=[p[0]+rnd(),p[1]+rnd(),1]};
+    const rs=[sc[0]-sw/2,sc[1]+6-tilt], ls=[sc[0]+sw/2,sc[1]-6+tilt];
+    const P=[sc[0],sc[1]+10], R=232, hands=[P[0]-R*Math.sin(a)*.85,P[1]+R*Math.cos(a)];
+    set(0,[sc[0]-3+2*Math.sin(r(ts)),330+(t>t1&&t<t3?4:0)]);
+    set(11,ls);set(12,rs);
+    set(23,[hc[0]+hw/2,hc[1]]);set(24,[hc[0]-hw/2,hc[1]]);
+    set(15,[hands[0]+3,hands[1]-6]);set(16,[hands[0]-3,hands[1]+6]);
+    const Lr=dist([358+75,414],[358,662])/2*1.01;
+    const le=mid(ls,hands),dl=dist(ls,hands)||1;set(13,[le[0]+(hands[1]-ls[1])/dl*4,le[1]-(hands[0]-ls[0])/dl*4]);set(14,ik(rs,hands,Lr,Lr,true));
+    const fin=t>t2?Math.min(1,(t-t2)/(t3-t2)):0;
+    set(25,[407+shift*.4+6*fin,762]);set(26,[316+shift*.5+14*fin,766]);
+    set(27,[420,902]);set(28,[300,902-10*fin]);
+    set(7,[L[0][0]+16,L[0][1]-8]);set(8,[L[0][0]-16,L[0][1]-8]);
+    const w=Array.from({length:33},()=>[0,0,0]);
+    w[11]=[.19*Math.cos(r(ts)),-.5,-.19*Math.sin(r(ts))];w[12]=[-w[11][0],-.5,-w[11][2]];
+    w[23]=[.13*Math.cos(r(th)),0,-.13*Math.sin(r(th))];w[24]=[-w[23][0],0,-w[23][2]];
+    frames.push({t,p:L,w});
+  }
+  return {frames,W,H};
+}
+
+/* ---------- smoothing ---------- */
+function prepare(frames){
+  const n=frames.length, ok=frames.map(f=>!!f.p);
+  const good=ok.filter(Boolean).length;
+  if(good<n*0.4) throw new Error('人物の骨格をほとんど検出できませんでした。全身が映る明るい動画でお試しください。');
+  // fill gaps by linear interpolation
+  for(let i=0;i<n;i++) if(!ok[i]){
+    let a=i-1;while(a>=0&&!ok[a])a--; let b=i+1;while(b<n&&!ok[b])b++;
+    const A=a>=0?frames[a].p:null,B=b<n?frames[b].p:null;
+    frames[i].p=(A&&B)?A.map((q,k)=>{const w=(i-a)/(b-a);return [q[0]+(B[k][0]-q[0])*w,q[1]+(B[k][1]-q[1])*w,0]}):(A||B).map(q=>[...q]);
+  }
+  // centered moving average (~0.15 s)
+  const fpsEst=n>1?(n-1)/(frames[n-1].t-frames[0].t||1):30, hw=Math.max(2,Math.round(fpsEst*0.075));S.hw=hw;
+  const raw=frames.map(f=>f.p.map(q=>[...q]));
+  for(let i=0;i<n;i++) for(let k=0;k<33;k++){
+    let sx=0,sy=0,c=0;for(let j=Math.max(0,i-hw);j<=Math.min(n-1,i+hw);j++){sx+=raw[j][k][0];sy+=raw[j][k][1];c++}
+    frames[i].p[k][0]=sx/c;frames[i].p[k][1]=sy/c;
+  }
+  return frames;
+}
+
+/* ---------- analysis ---------- */
+function analyze(){
+  const F=S.frames, n=F.length, hand=$('hand').value, view=$('view').value;
+  const slow=+$('slow').value, heightCm=clamp(+$('height').value||170,120,210);
+  const tdir = hand==='R'?1:-1;
+  const lead = hand==='R'?{s:11,e:13,w:15,h:23,k:25,a:27}:{s:12,e:14,w:16,h:24,k:26,a:28};
+  const trail= hand==='R'?{s:12,e:14,w:16,h:24,k:26,a:28}:{s:11,e:13,w:15,h:23,k:25,a:27};
+  const dt=i=>(F[i].t)/slow;
+  const hands=F.map(f=>mid(f.p[15],f.p[16]));
+  const sp=hands.map((_,i)=>{const a=Math.max(0,i-1),b=Math.min(n-1,i+1);return b===a?0:dist(hands[a],hands[b])/((F[b].t-F[a].t)/slow)});
+  // phases
+  let pk=0;for(let i=1;i<n;i++) if(sp[i]>sp[pk])pk=i;
+  let imp=pk;for(let i=Math.max(0,pk-6);i<=Math.min(n-1,pk+6);i++) if(hands[i][1]>hands[imp][1])imp=i;
+  let topHi=0;for(let i=0;i<imp;i++) if(hands[i][1]<hands[topHi][1])topHi=i;
+  let top=imp;while(top>topHi&&sp[top]>sp[pk]*0.15)top--;
+  const thr=sp[pk]*0.08;
+  let adr=topHi;while(adr>0&&sp[adr]<=thr)adr--;while(adr>0&&sp[adr]>thr)adr--;
+  let fin=imp;while(fin<n-1&&!(sp[fin]<=thr&&fin>imp+3))fin++;
+  const valid = topHi>adr && imp>top && sp[pk]>0;
+  const P={1:adr,4:top,7:imp,10:fin};
+  const pause=(F[top].t-F[topHi].t)/slow;
+  // scale
+  const p0=F[adr].p, bodyPx=mid(p0[27],p0[28])[1]-p0[0][1];
+  const cm=heightCm*0.8/Math.max(1,bodyPx);
+  // rotation from 3D world landmarks (lead - trail vector in x-z plane)
+  const hw=S.hw||2;const smooth=arr=>arr.map((_,i)=>{let s_=0,c=0;for(let j=Math.max(0,i-hw);j<=Math.min(n-1,i+hw);j++){s_+=arr[j];c++}return s_/c});
+  const turn3d=(a,b)=>{
+    let raw=F.map(f=>f.w?Math.atan2(f.w[a][2]-f.w[b][2],f.w[a][0]-f.w[b][0]):null);
+    let last=raw.find(v=>v!=null)??0;raw=raw.map(v=>v==null?last:(last=v));
+    for(let i=1;i<n;i++){while(raw[i]-raw[i-1]>Math.PI)raw[i]-=2*Math.PI;while(raw[i]-raw[i-1]<-Math.PI)raw[i]+=2*Math.PI}
+    const base=raw.slice(Math.max(0,adr-8),adr+1).sort((x,y)=>x-y);const m=base[base.length>>1];
+    return smooth(raw.map(v=>-tdir*deg(v-m)));};
+  const shT=turn3d(lead.s,trail.s), hpT=turn3d(lead.h,trail.h);
+  const spine=F.map(f=>{const h=mid(f.p[23],f.p[24]),s=mid(f.p[11],f.p[12]);const a=deg(Math.atan2(s[0]-h[0],-(s[1]-h[1])));return view==='face'?-tdir*a:tdir*a;});
+  const leadElbow=F.map(f=>angleAt(f.p[lead.s],f.p[lead.e],f.p[lead.w]));
+  const trailKnee=F.map(f=>angleAt(f.p[trail.h],f.p[trail.k],f.p[trail.a]));
+  const hc=f=>[(f.p[0][0]+f.p[7][0]+f.p[8][0])/3,(f.p[0][1]+f.p[7][1]+f.p[8][1])/3];
+  const h0=hc(F[adr]);
+  const head=F.map(f=>dist(hc(f),h0)*cm);
+  const headSide=F.map(f=>(hc(f)[0]-h0[0])*-tdir*cm);   // face: + = toward trail side / dtl: + = away from ball
+  const headDown=F.map(f=>(hc(f)[1]-h0[1])*cm);          // + = sinking
+  const hip0=mid(p0[23],p0[24]);
+  const hipX=F.map(f=>(mid(f.p[23],f.p[24])[0]-hip0[0])*tdir*cm);
+  const handH=hands.map(h=>(hands[adr][1]-h[1])*cm);
+  const speed=sp.map(v=>v*cm/100);
+  const back=(F[top].t-F[adr].t)/slow, down=(F[imp].t-F[top].t)/slow;
+  S.A={valid,P,cm,tdir,lead,trail,view,shT,hpT,spine,leadElbow,trailKnee,head,headSide,headDown,hipX,handH,speed,hands,
+    back,down,pause,tempo:down>0?back/down:0,peak:speed[pk],pk,headR:6/cm,h0};
+}
+
+/* ---------- formatting ---------- */
+const f0=v=>Number.isFinite(v)?Math.round(v).toString():'–';
+const f1=v=>Number.isFinite(v)?v.toFixed(1):'–';
+const st={good:['良好','●'],warn:['注意','▲'],bad:['要改善','■']};
+const pill=s=>`<span class="pill ${s}"><span aria-hidden="true">${st[s][1]}</span>${st[s][0]}</span>`;
+
+function renderPanel(){
+  const A=S.A, P=A.P;
+  const tempoState=A.tempo>=2.6&&A.tempo<=3.6?'good':(A.tempo>=2.1&&A.tempo<=4.2?'warn':'bad');
+  $('kpis').innerHTML=[
+    ['テンポ',`${f1(A.tempo)}<small>: 1</small>`,'目安 3 : 1'],
+    ['バックスイング',`${A.back.toFixed(2)}<small>s</small>`,'P1 → P4（間を含む）'],
+    ['ダウンスイング',`${A.down.toFixed(2)}<small>s</small>`,'P4 → P7'],
+    ['トップの間',`${A.pause.toFixed(2)}<small>s</small>`,'手が止まっている時間']
+  ].map(([k,v,s])=>`<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+
+  const face=A.view==='face', R_=$('hand').value==='R';
+  $('viewNote').textContent=face?'正面からの推定値':'後方からの推定値';
+  const rows=[];
+  const at=(arr,fmt=f0)=>[P[1],P[4],P[7]].map(i=>fmt(arr[i]));
+  rows.push(['肩の回転','°',at(A.shT),'3D推定・低めに出やすい']);
+  rows.push(['腰の回転','°',at(A.hpT),'3D推定・低めに出やすい']);
+  rows.push(['捻転差（肩−腰）','°',[P[1],P[4],P[7]].map(i=>f0(A.shT[i]-A.hpT[i])),'トップ 25°以上']);
+  if(face){
+    rows.push(['頭の左右移動','cm',at(A.headSide,f1),'後ろ足側へ + ／ 10 cm以内']);
+    rows.push(['頭の上下移動','cm',at(A.headDown,f1),'沈み込み + ／ 5 cm以内']);
+    rows.push(['体の傾き','°',at(A.spine),'飛球線と逆側へ +']);
+    rows.push(['腰の横移動','cm',at(A.hipX,f1),'目標方向 +']);
+  }else{
+    rows.push(['頭の上下移動','cm',at(A.headDown,f1),'沈み込み + ／ 5 cm以内']);
+    rows.push(['前傾角','°',at(A.spine),'変化 ±5°以内']);
+    rows.push(['腰の前後移動','cm',at(A.hipX,f1),'ボール方向 +']);
+    rows.push([`${R_?'左':'右'}ひじ（リード腕）`,'°',at(A.leadElbow),'トップ 160°以上']);
+    rows.push([`${R_?'右':'左'}ひざ（後ろ足）`,'°',at(A.trailKnee),'曲げを保つ']);
+  }
+  $('tbl').innerHTML=`<thead><tr><th>項目</th><th><b>P1</b>アドレス</th><th><b>P4</b>トップ</th><th><b>P7</b>インパクト</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr><td>${r[0]}<span class="ref">${r[3]}</span></td>${r[2].map(v=>`<td class="num">${v}<small style="font-size:12px;color:var(--muted)"> ${r[1]}</small></td>`).join('')}</tr>`).join('')+'</tbody>';
+
+  const D=[];
+  D.push({s:tempoState,t:`テンポ ${f1(A.tempo)} : 1`,d:tempoState==='good'?'バックスイングとダウンスイングの時間配分が理想に近いリズムです。':(A.tempo<2.6?'切り返しが早めです。トップで一瞬「間」をつくる意識で、バックスイングをゆったり上げましょう。':(A.pause>=0.15?`トップで約${A.pause.toFixed(2)}秒の「間」があります。毎回同じなら個性ですが、ばらつく場合は間を短くして 3〜3.5 : 1 を目指しましょう。`:'バックスイングに対してダウンスイングが速すぎる、またはバックスイングがゆっくりすぎます。3 : 1 前後を目指しましょう。')),i:P[4]});
+  const hd=A.head[P[7]];
+  D.push({s:hd<=5?'good':hd<=10?'warn':'bad',t:`インパクトでの頭の位置ずれ ${f1(hd)} cm`,d:hd<=5?'インパクトで頭がアドレスの位置に戻っており、軸が安定しています。':'インパクトで頭がアドレスの位置からずれています。基準円を意識してスイングしましょう。',i:P[7]});
+  const dn=A.headDown[P[4]];
+  D.push({s:dn<=3?'good':dn<=6?'warn':'bad',t:`トップでの頭の沈み ${f1(Math.max(0,dn))} cm`,d:dn<=3?'トップまで頭の高さが保たれています。':'バックスイングで頭が沈んでいます。ひざと前傾の角度を保ったまま回転しましょう。',i:P[4]});
+  const sh=A.shT[P[4]], xf=sh-A.hpT[P[4]];
+  D.push({s:sh>=70?'good':sh>=50?'warn':'bad',t:`トップの肩の回転 ${f0(sh)}°（推定）`,d:sh>=70?'十分な肩の回転ができています。':'肩の回転が浅く、腕を上げる動きでクラブを上げている可能性があります。左肩をあごの下まで入れ、背中が目標を向くまで回しましょう。',i:P[4]});
+  D.push({s:xf>=25?'good':xf>=15?'warn':'bad',t:`捻転差 ${f0(xf)}°（推定）`,d:xf>=25?'上半身と下半身の捻転差が作れています。':'腰が回りすぎている、または肩の回転が浅い状態です。腰の回転を抑えて上半身をねじりましょう。',i:P[4]});
+  if(face){
+    const side=A.headSide[P[4]], sway=-A.hipX[P[4]], shiftImp=A.hipX[P[7]];
+    D.push({s:side<=8?'good':side<=12?'warn':'bad',t:`トップでの頭の横移動 ${f1(side)} cm`,d:side<=8?'頭の左右の動きは許容範囲です。':'バックスイングで頭が後ろ足側へ大きく動いています。鼻をボールの少し右に置いたまま胸を回す意識を持ちましょう。',i:P[4]});
+    D.push({s:sway<=6?'good':sway<=10?'warn':'bad',t:`バックスイングの腰の横ずれ ${f1(Math.max(0,sway))} cm`,d:sway<=6?'腰が後方へ流れず、その場で回転できています。':'バックスイングで腰が後方へ流れています（スウェー）。後ろ足の内側で体重を受け止めましょう。',i:P[4]});
+    D.push({s:shiftImp>=4?'good':shiftImp>=0?'warn':'bad',t:`インパクトの体重移動 ${f1(shiftImp)} cm`,d:shiftImp>=4?'腰が目標方向へ移動し、体重移動ができています。':'インパクトで腰が目標方向へ移動していません。切り返しで前足へ踏み込みましょう。',i:P[7]});
+  }else{
+    const ch=A.spine[P[7]]-A.spine[P[1]], ee=A.hipX[P[7]], el=A.leadElbow[P[4]];
+    D.push({s:Math.abs(ch)<=5?'good':Math.abs(ch)<=9?'warn':'bad',t:`前傾角の変化 ${ch>0?'+':''}${f0(ch)}°`,d:Math.abs(ch)<=5?'アドレスの前傾角をインパクトまで保てています。':'インパクトで上体が起き上がっています。お尻の位置を保ったまま回転しましょう。',i:P[7]});
+    D.push({s:ee<=4?'good':ee<=8?'warn':'bad',t:`腰のボール方向への移動 ${f1(ee)} cm`,d:ee<=4?'腰の突っ込み（アーリーエクステンション）は見られません。':'腰がボール側へ出ています（アーリーエクステンション）。お尻を後ろの壁につけたまま回る意識を。',i:P[7]});
+    D.push({s:el>=160?'good':el>=145?'warn':'bad',t:`トップのリード腕 ${f0(el)}°`,d:el>=160?'リード腕が伸び、大きなスイングアークを保てています。':'トップでリード腕のひじが曲がっています。腕の長さを保ったまま肩で上げましょう。',i:P[4]});
+  }
+  const order={bad:0,warn:1,good:2};
+  D.sort((a,b)=>order[a.s]-order[b.s]);
+  $('diag').innerHTML=D.map(x=>`<li><button data-i="${x.i}">${pill(x.s)}<span class="t">${x.t}</span><span class="go">P${Object.keys(P).find(k=>P[k]===x.i)} へ →</span><span class="d">${x.d}</span></button></li>`).join('');
+  $('diag').querySelectorAll('button').forEach(b=>b.onclick=()=>{stop();seek(+b.dataset.i)});
+
+  $('phases').innerHTML=[[1,'アドレス'],[4,'トップ'],[7,'インパクト'],[10,'フィニッシュ']].map(([k,l])=>`<button class="phase" data-i="${P[k]}"><b>P${k}</b><span>${l}</span></button>`).join('');
+  $('phases').querySelectorAll('button').forEach(b=>b.onclick=()=>{stop();seek(+b.dataset.i)});
+  $('scrub').max=S.frames.length-1;
+  buildCharts();
+}
+
+/* ---------- charts ---------- */
+let charts=[];
+function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function niceTicks(min,max,n=4){const span=(max-min)||1,s0=span/n,mag=10**Math.floor(Math.log10(s0)),e=s0/mag;const step=(e>=7.5?10:e>=3.5?5:e>=1.5?2:1)*mag;const lo=Math.floor(min/step)*step,hi=Math.ceil(max/step)*step;const t=[];for(let v=lo;v<=hi+step*1e-6;v+=step)t.push(+v.toFixed(6));return{lo,hi,t};}
+function buildCharts(){
+  const A=S.A, face=A.view==='face';
+  const defs=[
+    {title:'肩と腰の回転（推定）',unit:'°',series:[{label:'肩',v:A.shT,c:'--accent'},{label:'腰',v:A.hpT,c:'--accent-2',dash:true}]},
+    face?{title:'頭の移動（左右）',unit:'cm',series:[{label:'頭',v:A.headSide,c:'--accent'}]}:{title:'前傾角',unit:'°',series:[{label:'前傾角',v:A.spine,c:'--accent'}]},
+    {title:'手のスピード（低めに出ます）',unit:'m/s',series:[{label:'スピード',v:A.speed,c:'--accent'}]}
+  ];
+  const root=$('charts');root.innerHTML='';charts=[];
+  defs.forEach(d=>{
+    const el=document.createElement('div');el.className='chart';
+    el.innerHTML=`<h3>${d.title} <span style="color:var(--muted);font-weight:400">(${d.unit})</span></h3><div class="legend">${d.series.length>1?d.series.map(s=>`<span><i class="${s.dash?'dash':''}" style="border-color:var(${s.c})"></i>${s.label}</span>`).join(''):''}</div><canvas></canvas><div class="tip" hidden></div>`;
+    root.appendChild(el);
+    const c={d,el,cv:el.querySelector('canvas'),tip:el.querySelector('.tip'),hover:null};
+    const toIdx=ev=>{const r=c.cv.getBoundingClientRect();const x=ev.clientX-r.left;const g=c.g;if(!g)return 0;const t=g.x0+(x-g.l)/(g.w)*(g.x1-g.x0);return nearest(t)};
+    c.cv.addEventListener('pointermove',ev=>{c.hover=toIdx(ev);if(ev.buttons&1){stop();seek(c.hover)}drawChart(c)});
+    c.cv.addEventListener('pointerdown',ev=>{c.cv.setPointerCapture(ev.pointerId);stop();seek(toIdx(ev))});
+    c.cv.addEventListener('pointerleave',()=>{c.hover=null;drawChart(c)});
+    charts.push(c);
+  });
+  drawCharts();
+}
+function nearest(t){const F=S.frames;let lo=0,hi=F.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(F[m].t<t)lo=m;else hi=m}return Math.abs(F[lo].t-t)<=Math.abs(F[hi].t-t)?lo:hi}
+function drawCharts(){charts.forEach(drawChart)}
+function drawChart(c){
+  const cv=c.cv,dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;if(!w)return;
+  cv.width=w*dpr;cv.height=h*dpr;const x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,w,h);
+  const F=S.frames,A=S.A,ink=cssVar('--ink'),muted=cssVar('--muted'),line=cssVar('--line'),surf=cssVar('--surface');
+  let mn=Infinity,mx=-Infinity;c.d.series.forEach(s=>s.v.forEach(v=>{if(v<mn)mn=v;if(v>mx)mx=v}));
+  const tk=niceTicks(mn,mx,4);
+  const l=36,r=10+(c.d.series.length>1?18:0),t=16,b=20;const g={l,w:w-l-r,x0:F[0].t,x1:F[F.length-1].t};c.g=g;
+  const X=tt=>l+(tt-g.x0)/(g.x1-g.x0||1)*g.w, Y=v=>t+(1-(v-tk.lo)/(tk.hi-tk.lo||1))*(h-t-b);
+  x.font='11px "Barlow Condensed", system-ui, sans-serif';x.textBaseline='middle';
+  tk.t.forEach(v=>{x.strokeStyle=line;x.lineWidth=1;x.beginPath();x.moveTo(l,Math.round(Y(v))+.5);x.lineTo(w-r,Math.round(Y(v))+.5);x.stroke();x.fillStyle=muted;x.textAlign='right';x.fillText(v,l-6,Y(v))});
+  // x ticks (seconds)
+  x.textAlign='center';x.textBaseline='top';const span=g.x1-g.x0,st=span>6?2:span>2.5?1:.5;
+  for(let s=Math.ceil(g.x0/st)*st;s<=g.x1+1e-6;s+=st){x.fillStyle=muted;x.fillText(s.toFixed(st<1?1:0)+'s',X(s),h-b+5)}
+  // phase markers
+  x.textBaseline='top';
+  Object.entries(A.P).forEach(([k,i])=>{const px=Math.round(X(F[i].t))+.5;x.strokeStyle=muted;x.globalAlpha=.55;x.setLineDash([2,3]);x.beginPath();x.moveTo(px,t);x.lineTo(px,h-b);x.stroke();x.setLineDash([]);x.globalAlpha=1;x.fillStyle=muted;x.fillText('P'+k,px,1)});
+  // series
+  c.d.series.forEach(s=>{x.strokeStyle=cssVar(s.c);x.lineWidth=2;x.lineJoin='round';x.setLineDash(s.dash?[5,3]:[]);x.beginPath();s.v.forEach((v,i)=>{const px=X(F[i].t),py=Y(v);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();x.setLineDash([]);
+});
+  if(c.d.series.length>1){const ls=c.d.series.map(s=>({s,y:Y(s.v[s.v.length-1])})).sort((p,q)=>p.y-q.y);
+    for(let k=1;k<ls.length;k++) if(ls[k].y-ls[k-1].y<12){const m=(ls[k].y+ls[k-1].y)/2;ls[k-1].y=m-6;ls[k].y=m+6}
+    ls.forEach(o=>{x.fillStyle=muted;x.textAlign='left';x.textBaseline='middle';x.fillText(o.s.label,w-r+4,o.y)})}
+  // cursor
+  const ci=c.hover??S.i, cx=X(F[ci].t);
+  x.strokeStyle=ink;x.lineWidth=1;x.beginPath();x.moveTo(Math.round(cx)+.5,t);x.lineTo(Math.round(cx)+.5,h-b);x.stroke();
+  c.d.series.forEach(s=>{x.fillStyle=cssVar(s.c);x.strokeStyle=surf;x.lineWidth=2;x.beginPath();x.arc(cx,Y(s.v[ci]),4.5,0,7);x.fill();x.stroke()});
+  if(c.hover!=null){c.tip.hidden=false;c.tip.style.left=clamp(cx+12,60,w-40)+'px';c.tip.style.top=(cv.offsetTop+8)+'px';
+    c.tip.innerHTML=`${(F[ci].t/(+$('slow').value)).toFixed(2)} s　`+c.d.series.map(s=>`${s.label} <b>${f1(s.v[ci])}</b>`).join('　')+` ${c.d.unit}`;}
+  else c.tip.hidden=true;
+}
+
+/* ---------- overlay ---------- */
+const ov=$('overlay'), video=$('video');
+function layoutStage(){
+  const box=$('box'),stage=$('stage');const maxH=Math.min(window.innerHeight*0.68,720);
+  const wAvail=stage.clientWidth;let w=wAvail,h=w*S.H/S.W;if(h>maxH){h=maxH;w=h*S.W/S.H}
+  box.style.width=w+'px';box.style.height=h+'px';ov.width=S.W;ov.height=S.H;
+}
+function drawOverlay(){
+  const x=ov.getContext('2d'),F=S.frames,A=S.A,i=S.i,W=S.W,H=S.H;x.clearRect(0,0,W,H);
+  if(S.source==='sample'){const gr=x.createLinearGradient(0,0,0,H);gr.addColorStop(0,'#1B2A20');gr.addColorStop(1,'#0B110D');x.fillStyle=gr;x.fillRect(0,0,W,H);
+    x.strokeStyle='rgba(233,240,234,.18)';x.lineWidth=2;x.beginPath();x.moveTo(0,H*.955);x.lineTo(W,H*.955);x.stroke();
+    x.fillStyle='rgba(233,240,234,.35)';x.font=`600 ${W/26}px "Barlow Condensed", sans-serif`;x.textAlign='left';x.textBaseline='top';x.fillText('SAMPLE · 合成データ',W*.04,H*.03);}
+  if(!F.length)return;
+  const p=F[i].p,u=Math.max(2,W/260),P=A.P;
+  if($('tSpine').checked){const p0=F[P[1]].p,h0=mid(p0[23],p0[24]),s0=mid(p0[11],p0[12]);const dx=s0[0]-h0[0],dy=s0[1]-h0[1];
+    x.strokeStyle='rgba(233,240,234,.55)';x.setLineDash([u*3,u*2.5]);x.lineWidth=u*.8;x.beginPath();x.moveTo(h0[0]-dx*.35,h0[1]-dy*.35);x.lineTo(s0[0]+dx*.55,s0[1]+dy*.55);x.stroke();x.setLineDash([]);}
+  if($('tHead').checked){const n0=A.h0,hcur=[(p[0][0]+p[7][0]+p[8][0])/3,(p[0][1]+p[7][1]+p[8][1])/3],rr=A.headR*1.0,far=dist(hcur,n0)>rr;
+    x.strokeStyle=far?'#FF9F43':'#6FD39A';x.lineWidth=u*.9;x.beginPath();x.arc(n0[0],n0[1],rr,0,7);x.stroke();}
+  if($('tPath').checked){const end=i;x.lineWidth=u*1.1;x.lineCap='round';
+    for(let k=Math.max(P[1],0)+1;k<=end;k++){const a=A.hands[k-1],b=A.hands[k];x.strokeStyle=k<=P[4]?'#6FD39A':(k<=P[7]?'#FF9F43':'rgba(255,159,67,.5)');x.beginPath();x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1]);x.stroke();}}
+  if($('tSkel').checked){x.lineCap='round';x.lineWidth=u*1.5;x.strokeStyle='#FFC94D';
+    BONES.forEach(([a,b])=>{x.beginPath();x.moveTo(p[a][0],p[a][1]);x.lineTo(p[b][0],p[b][1]);x.stroke()});
+    const sh=mid(p[11],p[12]);x.beginPath();x.moveTo(sh[0],sh[1]);x.lineTo(p[0][0],p[0][1]);x.stroke();
+    JOINTS.forEach(k=>{x.fillStyle='#FFFFFF';x.beginPath();x.arc(p[k][0],p[k][1],u*1.5,0,7);x.fill()});
+    if(A.view!=='face'){const e=p[A.lead.e];x.font=`700 ${u*8}px "Barlow Condensed", sans-serif`;x.textAlign='left';x.textBaseline='middle';
+    const txt=f0(A.leadElbow[i])+'°';x.lineWidth=u*2.2;x.strokeStyle='rgba(0,0,0,.65)';x.strokeText(txt,e[0]+u*4,e[1]);x.fillStyle='#FFFFFF';x.fillText(txt,e[0]+u*4,e[1]);}}
+}
+function renderFrame(){
+  drawOverlay();drawCharts();
+  $('scrub').value=S.i;$('time').textContent=(S.frames[S.i].t/(+$('slow').value)).toFixed(2)+' s';
+  const P=S.A.P;let cur=null;for(const k of [1,4,7,10]) if(S.i>=P[k])cur=k;
+  $('phases').querySelectorAll('.phase').forEach((b,j)=>b.classList.toggle('on',[1,4,7,10][j]===cur));
+}
+function seek(i){S.i=clamp(i,0,S.frames.length-1);if(S.source==='video'&&!S.playing){video.currentTime=S.frames[S.i].t}renderFrame();}
+
+/* ---------- playback ---------- */
+function play(){if(S.playing)return;if(S.i>=S.frames.length-1)S.i=0;S.playing=true;$('play').textContent='一時停止';const rate=+$('rate').value;
+  if(S.source==='video'){video.playbackRate=rate;video.currentTime=S.frames[S.i].t;video.play().catch(()=>{})}else{S.simT=S.frames[S.i].t}
+  S.lastTs=performance.now();requestAnimationFrame(tick);}
+function stop(){if(!S.playing)return;S.playing=false;$('play').textContent='再生';if(S.source==='video')video.pause();}
+function tick(ts){if(!S.playing)return;const F=S.frames,end=F[F.length-1].t;
+  if(S.source==='video'){if(video.ended||video.currentTime>=end){S.i=F.length-1;stop();renderFrame();return}S.i=nearest(video.currentTime)}
+  else{S.simT+=(ts-S.lastTs)/1000*(+$('rate').value);S.lastTs=ts;if(S.simT>=end){S.i=F.length-1;stop();renderFrame();return}S.i=nearest(S.simT)}
+  renderFrame();requestAnimationFrame(tick);}
+$('play').onclick=()=>S.playing?stop():play();
+$('prev').onclick=()=>{stop();seek(S.i-1)};$('next').onclick=()=>{stop();seek(S.i+1)};
+$('scrub').oninput=e=>{stop();seek(+e.target.value)};
+window.addEventListener('keydown',e=>{if(e.target.matches('input,select'))return;if(e.key===' '){e.preventDefault();S.playing?stop():play()}if(e.key==='ArrowLeft'){stop();seek(S.i-1)}if(e.key==='ArrowRight'){stop();seek(S.i+1)}});
+['tSkel','tPath','tHead','tSpine'].forEach(id=>$(id).onchange=renderFrame);
+['hand','view','height','slow'].forEach(id=>$(id).onchange=()=>{analyze();renderPanel();renderFrame()});
+window.addEventListener('resize',()=>{layoutStage();renderFrame()});
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>drawCharts());
+new MutationObserver(()=>drawCharts()).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+/* ---------- pose detection ---------- */
+let landmarkerP=null;
+function getLandmarker(){
+  if(landmarkerP)return landmarkerP;
+  landmarkerP=(async()=>{
+    busy('解析エンジンを読み込み中…',0.05);
+    const {PoseLandmarker}=await import(VISION_URL);
+    busy('解析モデルを読み込み中…',0.15);
+    const model=new Uint8Array(await (await fetch(new URL('model/pose_landmarker.wasm',location.href))).arrayBuffer());
+    const fileset={wasmLoaderPath:WASM_LOADER,wasmBinaryPath:new URL('wasm/vision_wasm_internal.wasm',location.href).href};
+    const mk=delegate=>PoseLandmarker.createFromOptions(fileset,{baseOptions:{modelAssetBuffer:model,delegate},runningMode:'VIDEO',numPoses:1,minPoseDetectionConfidence:.5,minTrackingConfidence:.5});
+    try{return await mk('GPU')}catch(e){return await mk('CPU')}
+  })();
+  landmarkerP.catch(()=>{landmarkerP=null});
+  return landmarkerP;
+}
+function busy(text,p){const b=$('busy');if(text==null){b.hidden=true;return}b.hidden=false;$('busyText').innerHTML=text;$('busyBar').style.width=Math.round((p||0)*100)+'%';}
+const once=(el,ev)=>new Promise((res,rej)=>{const ok=()=>{cl();res()},ng=()=>{cl();rej(new Error('この動画を再生できませんでした。iPhoneのHEVC動画はSafariで開くか、カメラ設定「互換性優先」で撮影した動画でお試しください。'))};const cl=()=>{el.removeEventListener(ev,ok);el.removeEventListener('error',ng)};el.addEventListener(ev,ok);el.addEventListener('error',ng)});
+let runId=0;
+async function analyzeFile(file){
+  if(!file||!file.type.startsWith('video'))return;
+  const my=++runId;stop();
+  try{
+    const lm=await getLandmarker();
+    busy('動画を読み込み中…',0.2);
+    if(video.src)URL.revokeObjectURL(video.src);
+    video.src=URL.createObjectURL(file);await once(video,'loadeddata');
+    const dur=Math.min(video.duration||0,15);
+    if(!dur)throw new Error('動画の長さを取得できませんでした。');
+    S.W=video.videoWidth;S.H=video.videoHeight;S.source='video';layoutStage();
+    const fps=dur<=6?60:FPS;const n=Math.floor(dur*fps),frames=[];let ts=0;
+    for(let k=0;k<=n;k++){
+      if(my!==runId)return;
+      const t=Math.min(k/fps,video.duration-0.001);video.currentTime=t;await once(video,'seeked');
+      ts+=Math.round(1000/fps);const r=lm.detectForVideo(video,ts);
+      const L=r.landmarks&&r.landmarks[0];
+      const Wl=r.worldLandmarks&&r.worldLandmarks[0];
+      frames.push({t,p:L?L.map(q=>[q.x*S.W,q.y*S.H,q.visibility??1]):null,w:Wl?Wl.map(q=>[q.x,q.y,q.z]):null});
+      if(k%3===0)busy(`骨格を検出中… <b>${Math.round(k/n*100)}%</b><br><small>${k} / ${n} コマ</small>`,0.2+0.8*k/n);
+    }
+    S.frames=prepare(frames);S.i=0;analyze();
+    if(!S.A.valid)throw new Error('スイングの区間を特定できませんでした。アドレスからフィニッシュまで映っているか確認してください。');
+    renderPanel();seek(S.A.P[1]);busy(null);
+    $('notice').querySelector('strong').textContent='解析完了';
+    $('noticeText').textContent=`${file.name}（${dur.toFixed(1)} 秒${video.duration>15?'・先頭15秒のみ':''}）を解析しました。数値は2D映像からの推定値です。撮影方向と利き手が正しいか確認してください。`;
+  }catch(e){
+    console.error(e);busy(`<span class="err">${e.message||'解析に失敗しました。'}</span><br><button class="btn" id="closeErr" style="margin-top:8px">閉じる</button>`,0);
+    $('closeErr').onclick=()=>{busy(null);if(S.source==='video'&&!S.A?.valid)loadSample()};
+  }
+}
+$('file').onchange=e=>{analyzeFile(e.target.files[0]);e.target.value=''};
+const stage=$('stage');
+stage.addEventListener('dragover',e=>{e.preventDefault();stage.classList.add('drag')});
+stage.addEventListener('dragleave',()=>stage.classList.remove('drag'));
+stage.addEventListener('drop',e=>{e.preventDefault();stage.classList.remove('drag');analyzeFile(e.dataTransfer.files[0])});
+
+function loadSample(){const s=makeSample();S.frames=prepare(s.frames);S.W=s.W;S.H=s.H;S.source='sample';video.removeAttribute('src');video.load();
+  layoutStage();analyze();renderPanel();S.i=S.A.P[4];renderFrame();}
+try{const sv=JSON.parse(localStorage.getItem('swinglab-settings')||'{}');['hand','view','height','slow'].forEach(k=>{if(sv[k]!=null)$(k).value=sv[k]})}catch(e){}
+['hand','view','height','slow'].forEach(k=>$(k).addEventListener('change',()=>{try{localStorage.setItem('swinglab-settings',JSON.stringify(Object.fromEntries(['hand','view','height','slow'].map(x=>[x,$(x).value]))))}catch(e){}}));
+loadSample();
+</script>
