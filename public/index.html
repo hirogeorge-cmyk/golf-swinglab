@@ -343,7 +343,10 @@ function prepare(frames,sw=S){
   }
   // centered moving average (~0.15 s)
   const fpsEst=n>1?(n-1)/(frames[n-1].t-frames[0].t||1):30, hw=Math.max(2,Math.round(fpsEst*0.075));sw.hw=hw;
-  const raw=frames.map(f=>f.p.map(q=>[...q]));
+  const med=frames.map(f=>f.p.map(q=>[...q]));
+  for(let i=0;i<n;i++) for(let k=0;k<33;k++) for(let c=0;c<2;c++){
+    const w=[];for(let j=Math.max(0,i-2);j<=Math.min(n-1,i+2);j++)w.push(frames[j].p[k][c]);w.sort((a,b)=>a-b);med[i][k][c]=w[w.length>>1];}
+  const raw=med;
   for(let i=0;i<n;i++) for(let k=0;k<33;k++){
     let sx=0,sy=0,c=0;for(let j=Math.max(0,i-hw);j<=Math.min(n-1,i+hw);j++){sx+=raw[j][k][0];sy+=raw[j][k][1];c++}
     frames[i].p[k][0]=sx/c;frames[i].p[k][1]=sy/c;
@@ -364,14 +367,24 @@ function analyze(sw=S,cfg=mainCfg()){
   const hands=F.map(f=>mid(f.p[15],f.p[16]));
   const sp=hands.map((_,i)=>{const a=Math.max(0,i-1),b=Math.min(n-1,i+1);return b===a?0:dist(hands[a],hands[b])/((F[b].t-F[a].t)/slow)});
   // phases
-  let pk=0;for(let i=1;i<n;i++) if(sp[i]>sp[pk])pk=i;
-  let imp=pk;for(let i=Math.max(0,pk-6);i<=Math.min(n-1,pk+6);i++) if(hands[i][1]>hands[imp][1])imp=i;
-  let topHi=0;for(let i=0;i<imp;i++) if(hands[i][1]<hands[topHi][1])topHi=i;
-  let top=imp;while(top>topHi&&sp[top]>sp[pk]*0.15)top--;
-  const thr=sp[pk]*0.08;
-  let adr=topHi;while(adr>0&&sp[adr]<=thr)adr--;while(adr>0&&sp[adr]>thr)adr--;
-  let fin=imp;while(fin<n-1&&!(sp[fin]<=thr&&fin>imp+3))fin++;
-  const valid = topHi>adr && imp>top && sp[pk]>0;
+  // smoothed speed (~0.1 s) so a single bad frame cannot become the "peak"
+  const sps=sp.map((_,i)=>{let a=0,c=0;for(let j=i-1;j>=0&&F[i].t-F[j].t<=0.05;j--){a+=sp[j];c++}for(let j=i;j<n&&F[j].t-F[i].t<=0.05;j++){a+=sp[j];c++}return a/c});
+  const tAt=i=>F[i].t/slow, idxAt=tt=>nearest(tt*slow,sw);
+  let pk=0;for(let i=1;i<n;i++) if(sps[i]>sps[pk])pk=i;
+  let imp=pk;for(let i=idxAt(tAt(pk)-0.1);i<=idxAt(tAt(pk)+0.1);i++) if(hands[i][1]>hands[imp][1])imp=i;
+  const lo0=idxAt(tAt(imp)-2.5), hi0=idxAt(tAt(imp)-0.12);
+  let topHi=lo0,maxY=-1e9;for(let i=lo0;i<=hi0;i++){if(hands[i][1]<hands[topHi][1])topHi=i;maxY=Math.max(maxY,hands[i][1])}
+  {const tol=0.03*(maxY-hands[topHi][1]);for(let i=lo0;i<=topHi;i++) if(hands[i][1]<=hands[topHi][1]+tol){topHi=i;break}}  // first arrival at the top
+  // start of the downswing = last moment the hands are still at top height (robust to jitter during a pause)
+  const minY=hands[topHi][1], range=maxY-minY;let top=topHi;
+  for(let i=topHi;i<imp;i++) if(hands[i][1]<=minY+0.04*range)top=i;
+  if(tAt(imp)-tAt(top)<0.12)top=topHi;
+  const thr=sps[pk]*0.08;
+  let adr=topHi;while(adr>0&&sps[adr]<=thr)adr--;while(adr>0&&sps[adr]>thr)adr--;
+  if(tAt(topHi)-tAt(adr)<0.3)adr=idxAt(Math.max(0,tAt(topHi)-1.0));
+  let fin=imp;while(fin<n-1&&!(sps[fin]<=thr&&tAt(fin)-tAt(imp)>0.25))fin++;
+  const dDown=tAt(imp)-tAt(top), dBack=tAt(top)-tAt(adr);
+  const valid = topHi>adr && imp>top && sps[pk]>0 && dDown>=0.1 && dDown<=1.0 && dBack>=0.3 && dBack<=3;
   const P={1:adr,4:top,7:imp,10:fin};
   const pause=(F[top].t-F[topHi].t)/slow;
   // scale
@@ -401,7 +414,11 @@ function analyze(sw=S,cfg=mainCfg()){
   const back=(F[top].t-F[adr].t)/slow, down=(F[imp].t-F[top].t)/slow;
   sw.A={valid,P,cm,tdir,lead,trail,view,shT,hpT,spine,leadElbow,trailKnee,head,headSide,headDown,hipX,handH,speed,hands,
     back,down,pause,tempo:down>0?back/down:0,peak:speed[pk],pk,headR:6/cm,h0,
-    crop:(()=>{const Hs=bodyPx/0.8,ank=mid(p0[27],p0[28]),h=Hs*1.8,w=h*0.75,bottom=ank[1]+Hs*0.16;return {x:mid(p0[23],p0[24])[0]-w/2,y:bottom-h,w,h}})()};
+    crop:(()=>{const seg=[];for(let i=Math.max(0,adr-10);i<=adr;i++){const q=F[i].p,sm=mid(q[11],q[12]),hm=mid(q[23],q[24]);
+        seg.push(dist(q[0],sm)+dist(sm,hm)+(dist(q[23],q[25])+dist(q[24],q[26]))/2+(dist(q[25],q[27])+dist(q[26],q[28]))/2)}
+      seg.sort((a,b)=>a-b);const L=seg[seg.length>>1];
+      const ank=mid(p0[27],p0[28]),h=L*1.9,w=h*0.75,bottom=Math.max(p0[27][1],p0[28][1])+L*0.12;
+      return {x:ank[0]-w/2,y:bottom-h,w,h}})()};
 }
 
 /* ---------- formatting ---------- */
@@ -624,6 +641,7 @@ function getLandmarker(prog=()=>{}){
 }
 function busy(text,p,id='busy'){const b=$(id);if(text==null){b.hidden=true;return}b.hidden=false;$(id+'Text').innerHTML=text;$(id+'Bar').style.width=Math.round((p||0)*100)+'%';}
 const once=(el,ev)=>new Promise((res,rej)=>{const ok=()=>{cl();res()},ng=()=>{cl();rej(new Error('この動画を再生できませんでした。iPhoneのHEVC動画はSafariで開くか、カメラ設定「互換性優先」で撮影した動画でお試しください。'))};const cl=()=>{el.removeEventListener(ev,ok);el.removeEventListener('error',ng)};el.addEventListener(ev,ok);el.addEventListener('error',ng)});
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let lmTs=0;
 async function detectVideo(file,v,prog,alive){
   const lm=await getLandmarker(prog);
@@ -633,14 +651,42 @@ async function detectVideo(file,v,prog,alive){
   const dur=Math.min(v.duration||0,15);
   if(!dur)throw new Error('動画の長さを取得できませんでした。');
   const W=v.videoWidth,H=v.videoHeight;
-  const fps=dur<=6?60:FPS;const n=Math.floor(dur*fps),frames=[];
-  for(let k=0;k<=n;k++){
-    if(!alive())return null;
-    const t=Math.min(k/fps,v.duration-0.001);v.currentTime=t;await once(v,'seeked');
-    lmTs+=Math.round(1000/fps);const r=lm.detectForVideo(v,lmTs);
-    const L=r.landmarks&&r.landmarks[0], Wl=r.worldLandmarks&&r.worldLandmarks[0];
-    frames.push({t,p:L?L.map(q=>[q.x*W,q.y*H,q.visibility??1]):null,w:Wl?Wl.map(q=>[q.x,q.y,q.z]):null});
-    if(k%3===0)prog(`骨格を検出中… <b>${Math.round(k/n*100)}%</b><br><small>${k} / ${n} コマ</small>`,0.2+0.8*k/n);
+  const toFrame=(t,r)=>{const L=r.landmarks&&r.landmarks[0], Wl=r.worldLandmarks&&r.worldLandmarks[0];
+    return {t,p:L?L.map(q=>[q.x*W,q.y*H,q.visibility??1]):null,w:Wl?Wl.map(q=>[q.x,q.y,q.z]):null}};
+  let frames=[];
+  if('requestVideoFrameCallback' in HTMLVideoElement.prototype){
+    // Play slowly and analyse every frame the browser actually presents, using its true timestamp.
+    // (Seeking is not frame-accurate in every browser/codec, which corrupts timing.)
+    v.currentTime=0;await Promise.race([once(v,'seeked'),sleep(1500)]).catch(()=>{});
+    const ok=await new Promise(res=>{
+      let last=-1,done=false;
+      const finish=r=>{if(done)return;done=true;v.pause();v.onended=null;res(r)};
+      const cb=(now,md)=>{
+        if(done)return;
+        if(!alive())return finish(false);
+        const t=md.mediaTime;
+        if(t>dur+0.0005)return finish(true);
+        v.pause();   // hold this frame while we analyse it, then step on to the next one
+        if(t>last+0.002){last=t;lmTs+=17;frames.push(toFrame(t,lm.detectForVideo(v,lmTs)));
+          if(frames.length%4===0)prog(`骨格を検出中… <b>${Math.round(t/dur*100)}%</b><br><small>${frames.length} コマ</small>`,0.2+0.8*t/dur);}
+        v.requestVideoFrameCallback(cb);v.play().catch(()=>finish(true));
+      };
+      v.onended=()=>finish(true);
+      v.requestVideoFrameCallback(cb);
+      v.playbackRate=1;v.muted=true;
+      v.play().catch(()=>finish(true));
+    });
+    if(!ok)return null;
+    v.playbackRate=1;
+  }
+  if(frames.length<dur*12){ // fallback: seek frame by frame
+    frames=[];const fps=dur<=6?60:FPS;const n=Math.floor(dur*fps);
+    for(let k=0;k<=n;k++){
+      if(!alive())return null;
+      const t=Math.min(k/fps,v.duration-0.001);v.currentTime=t;await once(v,'seeked');
+      lmTs+=17;frames.push(toFrame(v.currentTime,lm.detectForVideo(v,lmTs)));
+      if(k%3===0)prog(`骨格を検出中… <b>${Math.round(k/n*100)}%</b><br><small>${k} / ${n} コマ</small>`,0.2+0.8*k/n);
+    }
   }
   return {frames,W,H,dur,full:v.duration};
 }
@@ -669,7 +715,6 @@ stage.addEventListener('dragleave',()=>stage.classList.remove('drag'));
 stage.addEventListener('drop',e=>{e.preventDefault();stage.classList.remove('drag');analyzeFile(e.dataTransfer.files[0])});
 
 /* ---------- side-by-side players ---------- */
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function seekVid(sw,t){if(sw.source!=='video')return;const v=sw.video;if(Math.abs(v.currentTime-t)<0.004&&v.readyState>=2)return;v.currentTime=t;try{await Promise.race([once(v,'seeked'),sleep(1000)])}catch(e){}}
 function makePlayer(pfx,render){
   const P={i:0,playing:false,busy:false,dirty:false}, el=k=>$(pfx+k);
