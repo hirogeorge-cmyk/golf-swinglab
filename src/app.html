@@ -127,6 +127,25 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .cmp-head .settings{margin-top:14px}
 .cmp-table{margin-top:18px}
 .fitbar{margin-bottom:10px;color:var(--ink)}
+.upload{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:24px;margin-top:18px;align-items:stretch}
+@media (max-width:760px){.upload{grid-template-columns:minmax(0,1fr)}}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;min-height:320px;padding:32px 20px;border:2px dashed var(--line);border-radius:14px;background:var(--surface);cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.drag{border-color:var(--accent);background:var(--accent-soft)}
+.drop-icon{width:56px;height:56px;color:var(--accent);margin-bottom:6px}
+.drop-title{font-family:var(--f-display);font-weight:700;font-size:clamp(19px,5.4vw,24px);text-wrap:balance;letter-spacing:.02em}
+.drop-sub{color:var(--muted);font-size:13px}
+.drop-btn{margin-top:10px;pointer-events:none}
+.drop-meta{color:var(--muted);font-size:11.5px;margin-top:6px}
+.upload-side{min-width:0;padding-top:4px}
+.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:10px;color:var(--muted);font-size:13px}
+.steps b{color:var(--ink);font-weight:700}
+#results.processing .panel,#results.processing #charts,#results.processing .notice,#results.processing .transport,#results.processing .phases,#results.processing .toggles{display:none}
+#results.processing .grid{grid-template-columns:minmax(0,1fr)}
+.empty{margin-top:28px;padding:40px 20px;text-align:center;border:2px dashed var(--line);border-radius:14px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:12px}
+.empty p{margin:0}
+.m-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--stage-ink);cursor:pointer;border:2px dashed rgba(233,240,234,.25);border-radius:var(--r);z-index:2}
+.m-empty:hover{border-color:#6FD39A}
+.m-empty .drop-sub{color:rgba(233,240,234,.6)}
 td.diff{font-family:var(--f-display);font-size:16px;font-variant-numeric:tabular-nums;color:var(--muted)}
 td.diff b{color:var(--ink);font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -152,7 +171,25 @@ td.diff b{color:var(--ink);font-weight:600}
 </nav>
 
 <div id="view-analyze" class="view">
-<div class="notice" id="notice"><strong>サンプル表示中</strong><span id="noticeText">合成したスイングデータで画面の見方を示しています。自分のスイング動画を選ぶと、ブラウザ内で骨格を検出して解析します（動画は外部に送信されません）。</span></div>
+<section class="upload" id="upload" aria-label="動画のアップロード">
+  <label class="drop" id="drop" for="file">
+    <svg class="drop-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="11" width="28" height="26" rx="4" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M33 20l10-6v20l-10-6z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M19 30V18m0 0l-5 5m5-5l5 5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="drop-title">スイング動画をアップロード</span>
+    <span class="drop-sub">ここに動画をドロップ、またはタップして選択</span>
+    <span class="btn primary drop-btn">動画を選ぶ</span>
+    <span class="drop-meta">MP4・MOV ／ 15秒以内 ／ 動画は端末の外に送信されません</span>
+  </label>
+  <div class="upload-side">
+    <h2>選ぶ前に確認</h2>
+    <ol class="steps">
+      <li><b>利き手・撮影方向・身長</b>を画面上部で合わせます。あとから変えても再計算されます。</li>
+      <li><b>全身が映った動画</b>を選びます。頭から足先、トップのクラブまで入っていると精度が上がります。</li>
+      <li>解析が終わると、骨格を重ねた動画・数値・診断が表示されます。<b>元動画と並べる</b>・<b>お手本と比較</b>のタブも使えるようになります。</li>
+    </ol>
+  </div>
+</section>
+<div id="results" hidden>
+<div class="notice" id="notice"><strong>解析完了</strong><span id="noticeText">合成したスイングデータで画面の見方を示しています。自分のスイング動画を選ぶと、ブラウザ内で骨格を検出して解析します（動画は外部に送信されません）。</span></div>
 
 <div class="grid">
   <section class="stage-col" aria-label="動画">
@@ -195,6 +232,7 @@ td.diff b{color:var(--ink);font-weight:600}
 
 <section class="charts" id="charts" aria-label="時系列グラフ"></section>
 
+</div>
 <section class="howto" aria-label="撮影のコツ">
   <div><b>全身を入れる</b>頭から足先、クラブの振り上げまで画面に収まる距離で撮影します。</div>
   <div><b>カメラを固定</b>三脚などで固定し、手の高さ（腰〜胸）から撮ると角度が安定します。</div>
@@ -204,7 +242,9 @@ td.diff b{color:var(--ink);font-weight:600}
 </div>
 
 <div id="view-check" class="view" hidden>
-  <p class="intro">元の動画と、骨格・手の軌道を重ねた解析動画を同じ瞬間で並べます。対象は「解析」タブで選んだ動画（<b id="ckName">サンプル</b>）です。重ねる線は「解析」タブのチェックに従います。</p>
+  <div class="empty" id="ckEmpty"><p>先に「解析」タブで自分のスイング動画を選んでください。</p><a class="btn primary" href="#analyze">動画を選ぶ</a></div>
+  <div id="ckBody">
+  <p class="intro">元の動画と、骨格・手の軌道を重ねた解析動画を同じ瞬間で並べます。対象は「解析」タブで選んだ動画（<b id="ckName"></b>）です。重ねる線は「解析」タブのチェックに従います。</p>
   <div class="toggles fitbar"><label><input type="checkbox" id="ckFit" checked>人物の大きさ・位置をそろえ、アドレス直前から再生する</label></div>
   <div class="duo">
     <figure class="pane"><figcaption><span>元動画</span></figcaption><div class="stage2"><canvas id="ckRaw"></canvas></div></figure>
@@ -219,9 +259,12 @@ td.diff b{color:var(--ink);font-weight:600}
     <span class="time" id="ckTime">0.00 s</span>
   </div>
   <div class="phases" id="ckPhases"></div>
+  </div>
 </div>
 
 <div id="view-compare" class="view" hidden>
+  <div class="empty" id="cmEmpty"><p>先に「解析」タブで自分のスイング動画を選んでください。</p><a class="btn primary" href="#analyze">動画を選ぶ</a></div>
+  <div id="cmBody">
   <div class="cmp-head">
     <div class="settings">
       <label class="btn primary" for="mFile">お手本動画を選ぶ</label>
@@ -231,12 +274,12 @@ td.diff b{color:var(--ink);font-weight:600}
       <div class="field"><label for="mHeight">身長 cm</label><input id="mHeight" type="number" min="120" max="210" value="175"></div>
       <div class="field"><label for="mSlow">動画速度</label><select id="mSlow"><option value="1">通常</option><option value="2">スロー 1/2</option><option value="4">スロー 1/4</option><option value="8">スロー 1/8</option></select></div>
     </div>
-    <p class="intro" id="cmNote">お手本はサンプル（合成データ）です。上手な人のスイング動画を選ぶと入れ替わります。自分のスイングは「解析」タブで選んだ動画（<b id="cmName">サンプル</b>）です。2本は人物の大きさと立ち位置をそろえて切り抜き、アドレス・トップ・インパクト・フィニッシュの瞬間がそろうように同期して再生します。</p>
+    <p class="intro" id="cmNote">上手な人のスイング動画を「お手本動画を選ぶ」から選んでください。自分のスイングは「解析」タブで選んだ動画（<b id="cmName"></b>）です。2本は人物の大きさと立ち位置をそろえて切り抜き、アドレス・トップ・インパクト・フィニッシュの瞬間がそろうように同期して再生します。</p>
   </div>
   <div class="toggles fitbar"><label><input type="checkbox" id="cmFit" checked>人物の大きさ・位置をそろえ、アドレス直前から再生する</label></div>
   <div class="duo">
     <figure class="pane"><figcaption><span>お手本</span><span class="opts"><label><input type="checkbox" id="cmSkelA">骨格を重ねる</label><label><input type="checkbox" id="cmMirror">左右反転</label></span></figcaption>
-      <div class="stage2"><canvas id="cmA"></canvas><div class="busy" id="busyM" hidden><div id="busyMText">準備中…</div><div class="bar"><i id="busyMBar"></i></div></div></div></figure>
+      <div class="stage2"><canvas id="cmA"></canvas><label class="m-empty" id="mEmpty" for="mFile"><span class="drop-title">お手本動画を選ぶ</span><span class="drop-sub">上手な人のスイング動画</span></label><div class="busy" id="busyM" hidden><div id="busyMText">準備中…</div><div class="bar"><i id="busyMBar"></i></div></div></div></figure>
     <figure class="pane"><figcaption><span>自分</span><span class="opts"><label><input type="checkbox" id="cmSkelB" checked>骨格を重ねる</label></span></figcaption>
       <div class="stage2"><canvas id="cmB"></canvas></div></figure>
   </div>
@@ -252,6 +295,7 @@ td.diff b{color:var(--ink);font-weight:600}
   <div class="cmp-table">
     <h2>数値の比較 <small id="cmWarn"></small></h2>
     <div class="tbl-wrap"><table id="cmTbl"></table></div>
+  </div>
   </div>
 </div>
 
@@ -360,8 +404,13 @@ function analyze(sw=S,cfg=mainCfg()){
   let topHi=lo0,maxY=-1e9;for(let i=lo0;i<=hi0;i++){if(hands[i][1]<hands[topHi][1])topHi=i;maxY=Math.max(maxY,hands[i][1])}
   {const tol=0.03*(maxY-hands[topHi][1]);for(let i=lo0;i<=topHi;i++) if(hands[i][1]<=hands[topHi][1]+tol){topHi=i;break}}  // first arrival at the top
   // start of the downswing = last moment the hands are still at top height (robust to jitter during a pause)
-  const minY=hands[topHi][1], range=maxY-minY;let top=topHi;
-  for(let i=topHi;i<imp;i++) if(hands[i][1]<=minY+0.04*range)top=i;
+  // change of direction at the top = first moment the hands reverse their sideways movement
+  const vxs=hands.map((_,i)=>{const a=Math.max(0,i-2),b=Math.min(n-1,i+2);return (hands[b][0]-hands[a][0])/((F[b].t-F[a].t)||1)});
+  let s0=0;for(let i=idxAt(Math.max(0,tAt(topHi)-0.3));i<=topHi;i++)s0+=vxs[i];s0=Math.sign(s0)||1;
+  let top=-1;for(let i=topHi;i<imp-2;i++) if(Math.sign(vxs[i])!==s0&&Math.sign(vxs[i+1])!==s0&&Math.sign(vxs[i+2])!==s0){top=i;break}
+  if(top<0||tAt(imp)-tAt(top)<0.12){ // fallback: last moment the hands are still at top height
+    const minY=hands[topHi][1], range=maxY-minY;top=topHi;
+    for(let i=topHi;i<imp;i++) if(hands[i][1]<=minY+0.04*range)top=i;}
   if(tAt(imp)-tAt(top)<0.12)top=topHi;
   const thr=sps[pk]*0.08;
   let adr=topHi;while(adr>0&&sps[adr]<=thr)adr--;while(adr>0&&sps[adr]>thr)adr--;
@@ -598,12 +647,12 @@ function tick(ts){if(!S.playing)return;const F=S.frames,end=F[F.length-1].t;
 $('play').onclick=()=>S.playing?stop():play();
 $('prev').onclick=()=>{stop();seek(S.i-1)};$('next').onclick=()=>{stop();seek(S.i+1)};
 $('scrub').oninput=e=>{stop();seek(+e.target.value)};
-window.addEventListener('keydown',e=>{if(e.target.matches('input,select'))return;
+window.addEventListener('keydown',e=>{if(e.target.matches('input,select')||!S.A)return;
   if(curView!=='analyze'){const P=curView==='check'?ck:cm;if(e.key===' '){e.preventDefault();P.playing?P.stop():P.play()}if(e.key==='ArrowLeft'){P.stop();P.go(P.i-1)}if(e.key==='ArrowRight'){P.stop();P.go(P.i+1)}return}
   if(e.key===' '){e.preventDefault();S.playing?stop():play()}if(e.key==='ArrowLeft'){stop();seek(S.i-1)}if(e.key==='ArrowRight'){stop();seek(S.i+1)}});
 ['tSkel','tPath','tHead','tSpine'].forEach(id=>$(id).onchange=renderFrame);
-['hand','view','height','slow'].forEach(id=>$(id).onchange=()=>{analyze();renderPanel();renderFrame();onMainChanged()});
-window.addEventListener('resize',()=>{layoutStage();renderFrame()});
+['hand','view','height','slow'].forEach(id=>$(id).onchange=()=>{if(!S.A)return;analyze();renderPanel();renderFrame();onMainChanged()});
+window.addEventListener('resize',()=>{if(!S.A)return;layoutStage();renderFrame()});
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>drawCharts());
 new MutationObserver(()=>drawCharts()).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 
@@ -637,40 +686,21 @@ async function detectVideo(file,v,prog,alive){
   const W=v.videoWidth,H=v.videoHeight;
   const toFrame=(t,r)=>{const L=r.landmarks&&r.landmarks[0], Wl=r.worldLandmarks&&r.worldLandmarks[0];
     return {t,p:L?L.map(q=>[q.x*W,q.y*H,q.visibility??1]):null,w:Wl?Wl.map(q=>[q.x,q.y,q.z]):null}};
-  let frames=[];
-  if('requestVideoFrameCallback' in HTMLVideoElement.prototype){
-    // Play slowly and analyse every frame the browser actually presents, using its true timestamp.
-    // (Seeking is not frame-accurate in every browser/codec, which corrupts timing.)
-    v.currentTime=0;await Promise.race([once(v,'seeked'),sleep(1500)]).catch(()=>{});
-    const ok=await new Promise(res=>{
-      let last=-1,done=false;
-      const finish=r=>{if(done)return;done=true;v.pause();v.onended=null;res(r)};
-      const cb=(now,md)=>{
-        if(done)return;
-        if(!alive())return finish(false);
-        const t=md.mediaTime;
-        if(t>dur+0.0005)return finish(true);
-        v.pause();   // hold this frame while we analyse it, then step on to the next one
-        if(t>last+0.002){last=t;lmTs+=17;frames.push(toFrame(t,lm.detectForVideo(v,lmTs)));
-          if(frames.length%4===0)prog(`骨格を検出中… <b>${Math.round(t/dur*100)}%</b><br><small>${frames.length} コマ</small>`,0.2+0.8*t/dur);}
-        v.requestVideoFrameCallback(cb);v.play().catch(()=>finish(true));
-      };
-      v.onended=()=>finish(true);
-      v.requestVideoFrameCallback(cb);
-      v.playbackRate=1;v.muted=true;
-      v.play().catch(()=>finish(true));
-    });
-    if(!ok)return null;
-    v.playbackRate=1;
-  }
-  if(frames.length<dur*12){ // fallback: seek frame by frame
-    frames=[];const fps=dur<=6?60:FPS;const n=Math.floor(dur*fps);
-    for(let k=0;k<=n;k++){
-      if(!alive())return null;
-      const t=Math.min(k/fps,v.duration-0.001);v.currentTime=t;await once(v,'seeked');
-      lmTs+=17;frames.push(toFrame(v.currentTime,lm.detectForVideo(v,lmTs)));
-      if(k%3===0)prog(`骨格を検出中… <b>${Math.round(k/n*100)}%</b><br><small>${k} / ${n} コマ</small>`,0.2+0.8*k/n);
-    }
+  // Seek frame by frame, but take each frame's time from the frame the browser actually shows
+  // (requestVideoFrameCallback). Seeks are not frame-accurate in every browser/codec; repeated
+  // frames are skipped so they can't fake a sudden jump in hand speed.
+  const rvfc='requestVideoFrameCallback' in HTMLVideoElement.prototype;
+  const frames=[];const fps=dur<=6?60:FPS;const n=Math.floor(dur*fps);let lastMT=-1;
+  for(let k=0;k<=n;k++){
+    if(!alive())return null;
+    const t=Math.min(k/fps,v.duration-0.001);
+    const shown=rvfc?new Promise(res=>v.requestVideoFrameCallback((now,md)=>res(md.mediaTime))):null;
+    v.currentTime=t;await once(v,'seeked');
+    let mt=t;
+    if(shown){const r=await Promise.race([shown,sleep(150).then(()=>null)]);if(r==null){if(k>0)continue}else mt=r}
+    if(mt<=lastMT+0.001)continue;
+    lastMT=mt;lmTs+=17;frames.push(toFrame(mt,lm.detectForVideo(v,lmTs)));
+    if(k%3===0)prog(`骨格を検出中… <b>${Math.round(k/n*100)}%</b><br><small>${k} / ${n} コマ</small>`,0.2+0.8*k/n);
   }
   return {frames,W,H,dur,full:v.duration};
 }
@@ -679,20 +709,31 @@ async function analyzeFile(file){
   if(!file||!file.type.startsWith('video'))return;
   const my=++runId;stop();
   try{
+    S.A=null;setMainUI('processing');location.hash==='#analyze'||!location.hash?null:(location.hash='#analyze');
     const r=await detectVideo(file,video,(t,p)=>busy(t,p),()=>my===runId);
     if(!r)return;
     S.W=r.W;S.H=r.H;S.source='video';S.video=video;S.name=file.name;layoutStage();
     S.frames=prepare(r.frames,S);S.i=0;analyze();
     if(!S.A.valid)throw new Error('スイングの区間を特定できませんでした。アドレスからフィニッシュまで映っているか確認してください。');
-    renderPanel();seek(S.A.P[1]);busy(null);onMainChanged();
+    setMainUI('done');layoutStage();renderPanel();seek(S.A.P[1]);busy(null);onMainChanged();
     $('notice').querySelector('strong').textContent='解析完了';
     $('noticeText').textContent=`${file.name}（${r.dur.toFixed(1)} 秒${r.full>15?'・先頭15秒のみ':''}）を解析しました。数値は2D映像からの推定値です。撮影方向と利き手が正しいか確認してください。`;
   }catch(e){
     console.error(e);busy(`<span class="err">${e.message||'解析に失敗しました。'}</span><br><button class="btn" id="closeErr" style="margin-top:8px">閉じる</button>`,0);
-    $('closeErr').onclick=()=>{busy(null);if(S.source==='video'&&!S.A?.valid)loadSample()};
+    $('closeErr').onclick=()=>{busy(null);resetMain()};
   }
 }
 $('file').onchange=e=>{analyzeFile(e.target.files[0]);e.target.value=''};
+function setMainUI(state){ // 'empty' | 'processing' | 'done'
+  $('upload').hidden=state!=='empty';$('results').hidden=state==='empty';
+  $('results').classList.toggle('processing',state==='processing');
+  if(state==='processing'){S.W=720;S.H=960;layoutStage();}
+}
+function resetMain(){runId++;S.A=null;S.frames=[];setMainUI('empty');onMainChanged();}
+const drop=$('drop');
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag')});
+drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag');analyzeFile(e.dataTransfer.files[0])});
 const stage=$('stage');
 stage.addEventListener('dragover',e=>{e.preventDefault();stage.classList.add('drag')});
 stage.addEventListener('dragleave',()=>stage.classList.remove('drag'));
@@ -740,7 +781,10 @@ function mapIdx(i){
   else{let g=1;while(g<3&&t>ka[g+1])g++;const u=(t-ka[g])/((ka[g+1]-ka[g])||1);tb=kb[g]+u*(kb[g+1]-kb[g]);}
   return nearest(tb,M);
 }
-const cm=makePlayer('cm',async i=>{const j=mapIdx(i);
+const cm=makePlayer('cm',async i=>{
+  $('mEmpty').hidden=!!M.A;
+  if(!M.A){await seekVid(S,S.frames[i].t);const c=$('cmA');c.width=600;c.height=800;c.getContext('2d').clearRect(0,0,600,800);drawSwing($('cmB'),S,i,{video:true,fit:$('cmFit').checked,...lineOpts($('cmSkelB').checked)});return}
+  const j=mapIdx(i);
   await Promise.all([seekVid(S,S.frames[i].t),seekVid(M,M.frames[j].t)]);
   const fit=$('cmFit').checked;
   drawSwing($('cmA'),M,j,{video:true,fit,mirror:$('cmMirror').checked,...lineOpts($('cmSkelA').checked)});
@@ -753,7 +797,8 @@ function keyRows(A,mode){const P=A.P;const r=[
   if(mode==='dtl')r.push(['前傾角の変化（P1→P7）',A.spine[P[7]]-A.spine[P[1]],'°',0],['腰のボール方向移動（P7）',A.hipX[P[7]],' cm',1]);
   return r;}
 function renderCmp(){
-  if(!M.A||!S.A)return;
+  if(!S.A)return;
+  if(!M.A){$('cmWarn').textContent='';$('cmTbl').innerHTML='<tbody><tr><td style="color:var(--muted);white-space:normal">お手本動画を選ぶと、ここに数値の比較が表示されます。</td></tr></tbody>';return}
   const same=M.A.view===S.A.view, mode=same?S.A.view:null;
   $('cmWarn').textContent=same?'自分 − お手本':'撮影方向が違うため、共通の項目だけを比べています';
   const a=keyRows(M.A,mode),b=keyRows(S.A,mode);
@@ -768,15 +813,17 @@ $('mFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(
     if(!M.A.valid)throw new Error('お手本動画のスイング区間を特定できませんでした。アドレスからフィニッシュまで映っている動画を選んでください。');
     busy(null,0,'busyM');
     $('cmNote').innerHTML=`お手本：<b>${M.name.replace(/[<>&]/g,'')}</b>　自分：<b id="cmName"></b>　人物の大きさと立ち位置をそろえ、アドレス・トップ・インパクト・フィニッシュの瞬間を同期して再生します。`;
-    $('cmName').textContent=S.name||'サンプル';renderCmp();cm.go(cm.i);
+    $('cmName').textContent=S.name||'';renderCmp();if(S.A)cm.go(cm.i);
   }catch(err){console.error(err);busy(`<span class="err">${err.message||'解析に失敗しました。'}</span><br><button class="btn" id="closeErrM" style="margin-top:8px">閉じる</button>`,0,'busyM');
-    $('closeErrM').onclick=()=>{busy(null,0,'busyM');if(M.source!=='video'||!M.A?.valid){loadModelSample();renderCmp();cm.go(cm.i)}}}
+    $('closeErrM').onclick=()=>{busy(null,0,'busyM');if(!M.A?.valid){M.A=null;renderCmp();cm.go(cm.i)}}}
 };
-['mHand','mView','mHeight','mSlow'].forEach(id=>$(id).onchange=()=>{analyze(M,mCfg());renderCmp();cm.go(cm.i)});
+['mHand','mView','mHeight','mSlow'].forEach(id=>$(id).onchange=()=>{if(!M.A)return;analyze(M,mCfg());renderCmp();if(S.A)cm.go(cm.i)});
 ['cmSkelA','cmSkelB','cmMirror'].forEach(id=>$(id).onchange=()=>cm.draw());
 
 function onMainChanged(){
-  ['ckName','cmName'].forEach(id=>{const e=$(id);if(e)e.textContent=S.name||'サンプル'});
+  const has=!!S.A;['ck','cm'].forEach(p=>{$(p+'Empty').hidden=has;$(p+'Body').hidden=!has});
+  if(!has)return;
+  ['ckName','cmName'].forEach(id=>{const e=$(id);if(e)e.textContent=S.name||''});
   ck.phases();cm.phases();renderCmp();
   if(curView==='check')ck.go(S.i);if(curView==='compare')cm.go(S.i);
 }
@@ -789,6 +836,7 @@ function showView(v){
   stop();ck.stop();cm.stop();curView=v;
   VIEWS.forEach(x=>$('view-'+x).hidden=x!==v);
   document.querySelectorAll('.tabs a').forEach(a=>a.dataset.view===v?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current'));
+  if(!S.A)return;
   if(v==='analyze'){layoutStage();seek(S.i)}else if(v==='check')ck.go(S.i);else cm.go(S.i);
 }
 addEventListener('hashchange',()=>showView(location.hash.slice(1)));
@@ -798,7 +846,6 @@ function loadSample(){const s=makeSample(SAMPLE_ME);S.frames=prepare(s.frames,S)
   layoutStage();analyze();renderPanel();S.i=S.A.P[4];renderFrame();onMainChanged();}
 try{const sv=JSON.parse(localStorage.getItem('swinglab-settings')||'{}');['hand','view','height','slow'].forEach(k=>{if(sv[k]!=null)$(k).value=sv[k]})}catch(e){}
 ['hand','view','height','slow'].forEach(k=>$(k).addEventListener('change',()=>{try{localStorage.setItem('swinglab-settings',JSON.stringify(Object.fromEntries(['hand','view','height','slow'].map(x=>[x,$(x).value]))))}catch(e){}}));
-loadModelSample();
-loadSample();
+setMainUI('empty');onMainChanged();renderCmp();
 showView(location.hash.slice(1));
 </script>
