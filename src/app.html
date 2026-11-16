@@ -127,6 +127,11 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .cmp-head .settings{margin-top:14px}
 .cmp-table{margin-top:18px}
 .fitbar{margin-bottom:10px;color:var(--ink)}
+.editbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.editbar .btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.edit-hint{flex-basis:100%;margin:2px 0 0;font-size:12.5px;color:var(--muted);background:var(--accent-soft);border-radius:8px;padding:8px 12px}
+.edit-hint b{color:var(--ink)}
+#overlay.editing{cursor:grab;touch-action:none}
 .upload{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:24px;margin-top:18px;align-items:stretch}
 @media (max-width:760px){.upload{grid-template-columns:minmax(0,1fr)}}
 .drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;min-height:320px;padding:32px 20px;border:2px dashed var(--line);border-radius:14px;background:var(--surface);cursor:pointer;transition:border-color .15s,background .15s}
@@ -214,6 +219,11 @@ td.diff b{color:var(--ink);font-weight:600}
       <label><input type="checkbox" id="tPath" checked>手の軌道</label>
       <label><input type="checkbox" id="tHead" checked>頭の基準円</label>
       <label><input type="checkbox" id="tSpine" checked>アドレス時の軸</label>
+    </div>
+    <div class="editbar">
+      <button class="btn" id="editBtn" aria-pressed="false">マーカーを修正</button>
+      <button class="btn" id="editReset" hidden>この瞬間の修正を戻す</button>
+      <p class="edit-hint" id="editHint" hidden>動画を止めた状態で、ずれている点をドラッグして正しい位置に動かします。<b>P1（アドレス）とP4（トップ）で両肩を本当の位置に置く</b>と、肩の回転を計算します（体の後ろに隠れた肩は、見えている肩と重なる位置に置いてください）。</p>
     </div>
   </section>
 
@@ -416,6 +426,7 @@ function analyze(sw=S,cfg=mainCfg()){
   let adr=topHi;while(adr>0&&sps[adr]<=thr)adr--;while(adr>0&&sps[adr]>thr)adr--;
   if(tAt(topHi)-tAt(adr)<0.3)adr=idxAt(Math.max(0,tAt(topHi)-1.0));
   let fin=imp;while(fin<n-1&&!(sps[fin]<=thr&&tAt(fin)-tAt(imp)>0.25))fin++;
+  if(sw.lockP)({adr,top,imp,fin,topHi}=sw.lockP);
   const dDown=tAt(imp)-tAt(top), dBack=tAt(top)-tAt(adr);
   const valid = topHi>adr && imp>top && sps[pk]>0 && dDown>=0.1 && dDown<=1.0 && dBack>=0.3 && dBack<=3;
   const P={1:adr,4:top,7:imp,10:fin};
@@ -445,7 +456,11 @@ function analyze(sw=S,cfg=mainCfg()){
   const handH=hands.map(h=>(hands[adr][1]-h[1])*cm);
   const speed=sp.map(v=>v*cm/100);
   const back=(F[top].t-F[adr].t)/slow, down=(F[imp].t-F[top].t)/slow;
-  sw.A={valid,P,cm,tdir,lead,trail,view,shT,hpT,spine,leadElbow,trailKnee,head,headSide,headDown,hipX,handH,speed,hands,
+  // turn from hand-corrected shoulder/hip points (face-on): horizontal width ratio, signed so >90° is possible
+  const manTurn=(a,b)=>{const ed=sw.edits||{},w0=(F[adr].p[a][0]-F[adr].p[b][0])*tdir;
+    return F.map((f,i)=>i===adr?0:(ed[i]&&(ed[i][a]||ed[i][b])&&view==='face'?deg(Math.acos(clamp((f.p[a][0]-f.p[b][0])*tdir/(w0||1),-1,1))):null))};
+  const shM=manTurn(lead.s,trail.s), hpM=manTurn(lead.h,trail.h);
+  sw.A={topHi,shM,hpM,valid,P,cm,tdir,lead,trail,view,shT,hpT,spine,leadElbow,trailKnee,head,headSide,headDown,hipX,handH,speed,hands,
     back,down,pause,tempo:down>0?back/down:0,peak:speed[pk],pk,headR:6/cm,h0,
     crop:(()=>{const seg=[];for(let i=Math.max(0,adr-10);i<=adr;i++){const q=F[i].p,sm=mid(q[11],q[12]),hm=mid(q[23],q[24]);
         seg.push(dist(q[0],sm)+dist(sm,hm)+(dist(q[23],q[25])+dist(q[24],q[26]))/2+(dist(q[25],q[27])+dist(q[26],q[28]))/2)}
@@ -474,6 +489,9 @@ function renderPanel(){
   $('viewNote').textContent=face?'正面からの推定値':'後方からの推定値';
   const rows=[];
   const at=(arr,fmt=f0)=>[P[1],P[4],P[7]].map(i=>fmt(arr[i]));
+  if(face){const mm=arr=>[P[1],P[4],P[7]].map(i=>arr[i]==null?'–':f0(arr[i]));
+    rows.push(['肩の回転（マーカー修正）','°',mm(A.shM),'トップで両肩を修正すると計算']);
+    rows.push(['腰の回転（マーカー修正）','°',mm(A.hpM),'トップで腰を修正すると計算']);}
   rows.push(['肩の回転（参考値）','°',at(A.shT),'1台のカメラでは実際より小さく出ます']);
   rows.push(['腰の回転（参考値）','°',at(A.hpT),'1台のカメラでは実際より小さく出ます']);
   if(face){
@@ -492,6 +510,9 @@ function renderPanel(){
     rows.map(r=>`<tr><td>${r[0]}<span class="ref">${r[3]}</span></td>${r[2].map(v=>`<td class="num">${v}<small style="font-size:12px;color:var(--muted)"> ${r[1]}</small></td>`).join('')}</tr>`).join('')+'</tbody>';
 
   const D=[];
+  if(face&&A.shM[P[4]]!=null){const sh=A.shM[P[4]];
+    D.push({s:sh>=85?'good':sh>=70?'warn':'bad',t:`トップの肩の回転 ${f0(sh)}°（マーカー修正）`,d:sh>=85?'十分な肩の回転ができています。':'肩の回転が浅めです。左肩をあごの下まで入れ、背中が目標を向くまで回しましょう。',i:P[4]});
+    if(A.hpM[P[4]]!=null){const xf=sh-A.hpM[P[4]];D.push({s:xf>=35?'good':xf>=20?'warn':'bad',t:`捻転差 ${f0(xf)}°（マーカー修正）`,d:xf>=35?'上半身と下半身の捻転差がしっかり作れています。':'腰が回りすぎている、または肩の回転が浅い状態です。',i:P[4]});}}
   D.push({s:tempoState,t:`テンポ ${f1(A.tempo)} : 1`,d:tempoState==='good'?'バックスイングとダウンスイングの時間配分が理想に近いリズムです。':(A.tempo<2.6?'切り返しが早めです。トップで一瞬「間」をつくる意識で、バックスイングをゆったり上げましょう。':(A.pause>=0.15?`トップで約${A.pause.toFixed(2)}秒の「間」があります。毎回同じなら個性ですが、ばらつく場合は間を短くして 3〜3.5 : 1 を目指しましょう。`:'バックスイングに対してダウンスイングが速すぎる、またはバックスイングがゆっくりすぎます。3 : 1 前後を目指しましょう。')),i:P[4]});
   const hd=A.head[P[7]];
   D.push({s:hd<=5?'good':hd<=10?'warn':'bad',t:`インパクトでの頭の位置ずれ ${f1(hd)} cm`,d:hd<=5?'インパクトで頭がアドレスの位置に戻っており、軸が安定しています。':'インパクトで頭がアドレスの位置からずれています。基準円を意識してスイングしましょう。',i:P[7]});
@@ -619,9 +640,13 @@ function drawSwing(cv,sw,i,o){
     JOINTS.forEach(j=>{x.fillStyle='#FFFFFF';x.beginPath();x.arc(p[j][0],p[j][1],u*1.5,0,7);x.fill()});
     if(A.view!=='face'&&!o.mirror){const e=p[A.lead.e];x.font=`700 ${u*8}px "Barlow Condensed", sans-serif`;x.textAlign='left';x.textBaseline='middle';
       const txt=f0(A.leadElbow[i])+'°';x.lineWidth=u*2.2;x.strokeStyle='rgba(0,0,0,.65)';x.strokeText(txt,e[0]+u*4,e[1]);x.fillStyle='#FFFFFF';x.fillText(txt,e[0]+u*4,e[1]);}}
+  if(o.edit){const ed=(sw.edits||{})[i]||{};x.lineWidth=u*0.9;
+    EDIT_J.forEach(j=>{x.beginPath();x.arc(p[j][0],p[j][1],u*5,0,7);x.fillStyle=ed[j]?'rgba(84,200,255,.45)':'rgba(255,255,255,.18)';x.fill();x.strokeStyle=ed[j]?'#54C8FF':'#FFFFFF';x.stroke()});}
   if(sw.source!=='video'){x.setTransform(1,0,0,1,0,0);x.fillStyle='rgba(233,240,234,.4)';x.font=`600 ${cw/24}px "Barlow Condensed", sans-serif`;x.textAlign='left';x.textBaseline='top';x.fillText('SAMPLE · 合成データ',cw*.04,ch*.03);}
 }
-const mainOpts=()=>({video:false,skel:$('tSkel').checked,path:$('tPath').checked,head:$('tHead').checked,spine:$('tSpine').checked});
+const EDIT_J=[0,11,12,13,14,15,16,23,24,25,26,27,28];
+let editMode=false,dragJ=null;
+const mainOpts=()=>({edit:editMode,video:false,skel:$('tSkel').checked,path:$('tPath').checked,head:$('tHead').checked,spine:$('tSpine').checked});
 function drawOverlay(){drawSwing(ov,S,S.i,mainOpts())}
 function renderFrame(){
   drawOverlay();drawCharts();
@@ -709,6 +734,7 @@ async function analyzeFile(file){
     const r=await detectVideo(file,video,(t,p)=>busy(t,p),()=>my===runId);
     if(!r)return;
     S.W=r.W;S.H=r.H;S.source='video';S.video=video;S.name=file.name;layoutStage();
+    S.edits={};S.orig={};S.lockP=null;if(editMode)setEdit(false);
     S.frames=prepare(r.frames,S);S.i=0;analyze();
     if(!S.A.valid)throw new Error('スイングの区間を特定できませんでした。アドレスからフィニッシュまで映っているか確認してください。');
     setMainUI('done');layoutStage();renderPanel();seek(S.A.P[1]);busy(null);onMainChanged();
@@ -720,6 +746,20 @@ async function analyzeFile(file){
   }
 }
 $('file').onchange=e=>{analyzeFile(e.target.files[0]);e.target.value=''};
+function setEdit(on){editMode=on;if(on)stop();$('editBtn').setAttribute('aria-pressed',on);$('editBtn').textContent=on?'修正を終える':'マーカーを修正';
+  $('editHint').hidden=!on;$('editReset').hidden=!on;ov.classList.toggle('editing',on);drawOverlay();}
+$('editBtn').onclick=()=>setEdit(!editMode);
+const ovPt=ev=>{const r=ov.getBoundingClientRect();return [(ev.clientX-r.left)/r.width*S.W,(ev.clientY-r.top)/r.height*S.H]};
+ov.addEventListener('pointerdown',ev=>{if(!editMode||!S.A)return;const q=ovPt(ev),p=S.frames[S.i].p;let best=-1,bd=1e9;
+  EDIT_J.forEach(j=>{const d=dist(q,p[j]);if(d<bd){bd=d;best=j}});
+  if(bd<Math.max(S.W,S.H)/14){dragJ=best;ov.setPointerCapture(ev.pointerId);ev.preventDefault();
+    S.orig=S.orig||{};S.orig[S.i]=S.orig[S.i]||S.frames[S.i].p.map(v=>[...v]);}});
+ov.addEventListener('pointermove',ev=>{if(dragJ==null)return;const q=ovPt(ev);S.frames[S.i].p[dragJ]=[q[0],q[1],1];
+  S.edits=S.edits||{};(S.edits[S.i]=S.edits[S.i]||{})[dragJ]=true;drawOverlay();});
+const endDrag=()=>{if(dragJ==null)return;dragJ=null;relock();};
+ov.addEventListener('pointerup',endDrag);ov.addEventListener('pointercancel',endDrag);
+function relock(){const A=S.A;S.lockP=S.lockP||{adr:A.P[1],top:A.P[4],imp:A.P[7],fin:A.P[10],topHi:A.topHi};const i=S.i;analyze();renderPanel();S.i=i;renderFrame();onMainChanged();}
+$('editReset').onclick=()=>{if(S.orig&&S.orig[S.i]){S.frames[S.i].p=S.orig[S.i];delete S.orig[S.i];if(S.edits)delete S.edits[S.i];relock();}};
 function setMainUI(state){ // 'empty' | 'processing' | 'done'
   $('upload').hidden=state!=='empty';$('results').hidden=state==='empty';
   $('results').classList.toggle('processing',state==='processing');
