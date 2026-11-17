@@ -814,7 +814,7 @@ new MutationObserver(()=>drawCharts()).observe(document.documentElement,{attribu
 
 /* ---------- pose detection ---------- */
 let landmarkerP=null;
-function getLandmarker(prog=()=>{}){
+function getLandmarker(prog=()=>{},forceCPU=false){
   if(landmarkerP)return landmarkerP;
   landmarkerP=(async()=>{
     prog('解析エンジンを読み込み中…',0.05);
@@ -823,20 +823,38 @@ function getLandmarker(prog=()=>{}){
     const model=new Uint8Array(await (await fetch(new URL('model/pose_landmarker.wasm',location.href))).arrayBuffer());
     const fileset={wasmLoaderPath:new URL(WASM_LOADER,location.href).href,wasmBinaryPath:new URL('wasm/vision_wasm_internal.wasm',location.href).href};
     const mk=delegate=>PoseLandmarker.createFromOptions(fileset,{baseOptions:{modelAssetBuffer:model,delegate},runningMode:'VIDEO',numPoses:1,minPoseDetectionConfidence:.5,minTrackingConfidence:.5});
+    if(forceCPU)return await mk('CPU');
     try{return await mk('GPU')}catch(e){return await mk('CPU')}
   })();
   landmarkerP.catch(()=>{landmarkerP=null});
   return landmarkerP;
 }
 function busy(text,p,id='busy'){const b=$(id);if(text==null){b.hidden=true;return}b.hidden=false;$(id+'Text').innerHTML=text;$(id+'Bar').style.width=Math.round((p||0)*100)+'%';}
+// Wait for one event, with a time limit, so a phone that never fires it shows a message instead of hanging.
+const waitEv=(el,ev,ms,msg)=>new Promise((res,rej)=>{let t;const done=f=>{clearTimeout(t);el.removeEventListener(ev,ok);el.removeEventListener('error',ng);f()};
+  const ok=()=>done(res),ng=()=>done(()=>rej(new Error(msg)));t=setTimeout(()=>done(()=>rej(new Error(msg))),ms);el.addEventListener(ev,ok);el.addEventListener('error',ng)});
+const isVideoFile=f=>!!f&&((f.type||'').startsWith('video')||/\.(mov|mp4|m4v|webm|3gp|avi)$/i.test(f.name||'')||!f.type);
+async function loadVideoFile(v,file){
+  if(v.src)URL.revokeObjectURL(v.src);
+  v.muted=true;v.defaultMuted=true;v.playsInline=true;v.setAttribute('playsinline','');v.setAttribute('webkit-playsinline','');v.preload='auto';
+  const bad='この動画を読み込めませんでした。別の動画で試すか、iPhoneのカメラ設定「フォーマット」を「互換性優先」にして撮影した動画をお試しください。';
+  v.src=URL.createObjectURL(file);v.load();
+  if(v.readyState<1)await waitEv(v,'loadedmetadata',20000,bad);
+  if(v.readyState<2){ // iPhone does not decode a frame until the video has played once
+    const p=waitEv(v,'loadeddata',10000,bad);
+    try{await v.play();v.pause()}catch(e){}
+    if(v.readyState<2)await p;else p.catch(()=>{});
+  }
+}
 const once=(el,ev)=>new Promise((res,rej)=>{const ok=()=>{cl();res()},ng=()=>{cl();rej(new Error('この動画を再生できませんでした。iPhoneのHEVC動画はSafariで開くか、カメラ設定「互換性優先」で撮影した動画でお試しください。'))};const cl=()=>{el.removeEventListener(ev,ok);el.removeEventListener('error',ng)};el.addEventListener(ev,ok);el.addEventListener('error',ng)});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let lmTs=0;
 async function detectVideo(file,v,prog,alive){
-  const lm=await getLandmarker(prog);
+  let lm=await getLandmarker(prog);
   prog('動画を読み込み中…',0.2);
-  if(v.src)URL.revokeObjectURL(v.src);
-  v.src=URL.createObjectURL(file);await once(v,'loadeddata');
+  await loadVideoFile(v,file);
+  // some phones create the GPU engine but fail on the first frame: fall back to the CPU engine
+  try{lmTs+=17;lm.detectForVideo(v,lmTs)}catch(e){console.warn('GPU detect failed, using CPU',e);landmarkerP=null;lm=await getLandmarker(prog,true)}
   const dur=Math.min(v.duration||0,15);
   if(!dur)throw new Error('動画の長さを取得できませんでした。');
   const W=v.videoWidth,H=v.videoHeight;
@@ -851,7 +869,7 @@ async function detectVideo(file,v,prog,alive){
     if(!alive())return null;
     const t=Math.min(k/fps,v.duration-0.001);
     const shown=rvfc?new Promise(res=>v.requestVideoFrameCallback((now,md)=>res(md.mediaTime))):null;
-    v.currentTime=t;await once(v,'seeked');
+    v.currentTime=t;try{await waitEv(v,'seeked',3000,'seek')}catch(e){continue}
     let mt=t;
     if(shown){const r=await Promise.race([shown,sleep(150).then(()=>null)]);if(r==null){if(k>0)continue}else mt=r}
     if(mt<=lastMT+0.001)continue;
@@ -862,7 +880,7 @@ async function detectVideo(file,v,prog,alive){
 }
 let runId=0;
 async function analyzeFile(file){
-  if(!file||!file.type.startsWith('video'))return;
+  if(!isVideoFile(file))return;
   const my=++runId;stop();
   try{
     S.A=null;setMainUI('processing');location.hash==='#analyze'||!location.hash?null:(location.hash='#analyze');
@@ -941,7 +959,9 @@ const ck=makePlayer('ck',async i=>{await seekVid(S,S.frames[i].t);const fit=$('c
 
 /* ---------- model (お手本) ---------- */
 const M={frames:[],W:720,H:960,source:'sample',video:document.createElement('video'),A:null,name:'サンプル'};
-M.video.muted=true;M.video.playsInline=true;M.video.preload='auto';
+M.video.muted=true;M.video.playsInline=true;M.video.preload='auto';M.video.setAttribute('playsinline','');
+// keep it in the page (off-screen): some phones do not decode a video that is not in the document
+M.video.style.cssText='position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none';document.body.appendChild(M.video);
 function mCfg(){return {hand:$('mHand').value,view:$('mView').value,slow:+$('mSlow').value,height:+$('mHeight').value}}
 function loadModelSample(){const s=makeSample(SAMPLE_PRO);M.frames=prepare(s.frames,M);M.W=s.W;M.H=s.H;M.source='sample';M.name='サンプル';analyze(M,mCfg());}
 function mapIdx(i){
@@ -981,7 +1001,7 @@ function renderCmp(){
     return `<tr><td>${r[0]}</td><td class="num">${fmt(r[1],r[3])}<small style="font-size:12px;color:var(--muted)">${r[2]}</small></td><td class="num">${fmt(b[k][1],r[3])}<small style="font-size:12px;color:var(--muted)">${r[2]}</small></td><td class="diff"><b>${v>0?'+':v<0?'−':'±'}${fmt(Math.abs(v),r[3])}</b>${r[2]}</td></tr>`}).join('')+'</tbody>';
 }
 let mRun=0;
-$('mFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!file||!file.type.startsWith('video'))return;const my=++mRun;cm.stop();
+$('mFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!isVideoFile(file))return;const my=++mRun;cm.stop();
   try{const r=await detectVideo(file,M.video,(t,p)=>busy(t,p,'busyM'),()=>my===mRun);if(!r)return;
     M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());
     if(!M.A.valid)throw new Error('お手本動画のスイング区間を特定できませんでした。アドレスからフィニッシュまで映っている動画を選んでください。');
