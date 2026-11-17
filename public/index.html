@@ -300,9 +300,9 @@ td.diff b{color:var(--ink);font-weight:600}
       <div class="field"><label for="mHeight">身長 cm</label><input id="mHeight" type="number" min="120" max="210" value="175"></div>
       <div class="field"><label for="mSlow">動画速度</label><select id="mSlow"><option value="1">通常</option><option value="2">スロー 1/2</option><option value="4">スロー 1/4</option><option value="8">スロー 1/8</option></select></div>
     </div>
-    <p class="intro" id="cmNote">上手な人のスイング動画を「お手本動画を選ぶ」から選んでください。自分のスイングは「解析」タブで選んだ動画（<b id="cmName"></b>）です。2本は人物の大きさと立ち位置をそろえて切り抜き、アドレス・トップ・インパクト・フィニッシュの瞬間がそろうように同期して再生します。</p>
+    <p class="intro" id="cmNote">上手な人のスイング動画を「お手本動画を選ぶ」から選んでください。自分のスイングは「解析」タブで選んだ動画（<b id="cmName"></b>）です。2本は人物の大きさと立ち位置をそろえて切り抜き、始動（アドレス）の瞬間をそろえて、あとはそれぞれ実際の速さで再生します。テンポの違いがそのまま見えます。</p>
   </div>
-  <div class="toggles fitbar"><label><input type="checkbox" id="cmFit" checked>人物の大きさ・位置をそろえ、アドレス直前から再生する</label></div>
+  <div class="toggles fitbar"><label><input type="checkbox" id="cmFit" checked>人物の大きさ・位置をそろえ、アドレス直前から再生する</label><label><input type="checkbox" id="cmSyncAll">トップ・インパクト・フィニッシュもそろえる</label></div>
   <div class="duo">
     <figure class="pane"><figcaption><span>お手本</span><span class="opts"><label><input type="checkbox" id="cmSkelA">骨格を重ねる</label><label><input type="checkbox" id="cmMirror">左右反転</label></span></figcaption>
       <div class="stage2"><canvas id="cmA"></canvas><label class="m-empty" id="mEmpty" for="mFile"><span class="drop-title">お手本動画を選ぶ</span><span class="drop-sub">上手な人のスイング動画</span></label><div class="busy" id="busyM" hidden><div id="busyMText">準備中…</div><div class="bar"><i id="busyMBar"></i></div></div></div></figure>
@@ -835,12 +835,15 @@ M.video.muted=true;M.video.playsInline=true;M.video.preload='auto';
 function mCfg(){return {hand:$('mHand').value,view:$('mView').value,slow:+$('mSlow').value,height:+$('mHeight').value}}
 function loadModelSample(){const s=makeSample(SAMPLE_PRO);M.frames=prepare(s.frames,M);M.W=s.W;M.H=s.H;M.source='sample';M.name='サンプル';analyze(M,mCfg());}
 function mapIdx(i){
+  // Align the start (address) only; after that both swings run at their real speed.
+  // Optional: also line up top / impact / finish (piecewise time-warp).
   const key=sw=>[0,sw.A.P[1],sw.A.P[4],sw.A.P[7],sw.A.P[10],sw.frames.length-1].map(k=>sw.frames[k].t);
   const ka=key(S),kb=key(M),t=S.frames[i].t,ra=M.cfg.slow/S.cfg.slow;let tb;
-  if(t<=ka[1])tb=Math.max(kb[0],kb[1]-(ka[1]-t)*ra);
-  else if(t>=ka[4])tb=Math.min(kb[5],kb[4]+(t-ka[4])*ra);
+  if(!$('cmSyncAll').checked)tb=kb[1]+(t-ka[1])*ra;
+  else if(t<=ka[1])tb=kb[1]-(ka[1]-t)*ra;
+  else if(t>=ka[4])tb=kb[4]+(t-ka[4])*ra;
   else{let g=1;while(g<3&&t>ka[g+1])g++;const u=(t-ka[g])/((ka[g+1]-ka[g])||1);tb=kb[g]+u*(kb[g+1]-kb[g]);}
-  return nearest(tb,M);
+  return nearest(clamp(tb,kb[0],kb[5]),M);
 }
 const cm=makePlayer('cm',async i=>{
   $('mEmpty').hidden=!!M.A;
@@ -873,13 +876,13 @@ $('mFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(
     M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());
     if(!M.A.valid)throw new Error('お手本動画のスイング区間を特定できませんでした。アドレスからフィニッシュまで映っている動画を選んでください。');
     busy(null,0,'busyM');
-    $('cmNote').innerHTML=`お手本：<b>${M.name.replace(/[<>&]/g,'')}</b>　自分：<b id="cmName"></b>　人物の大きさと立ち位置をそろえ、アドレス・トップ・インパクト・フィニッシュの瞬間を同期して再生します。`;
+    $('cmNote').innerHTML=`お手本：<b>${M.name.replace(/[<>&]/g,'')}</b>　自分：<b id="cmName"></b>　人物の大きさと立ち位置をそろえ、始動の瞬間をそろえて実際の速さで再生します。`;
     $('cmName').textContent=S.name||'';renderCmp();if(S.A)cm.go(cm.i);
   }catch(err){console.error(err);busy(`<span class="err">${err.message||'解析に失敗しました。'}</span><br><button class="btn" id="closeErrM" style="margin-top:8px">閉じる</button>`,0,'busyM');
     $('closeErrM').onclick=()=>{busy(null,0,'busyM');if(!M.A?.valid){M.A=null;renderCmp();cm.go(cm.i)}}}
 };
 ['mHand','mView','mHeight','mSlow'].forEach(id=>$(id).onchange=()=>{if(!M.A)return;analyze(M,mCfg());renderCmp();if(S.A)cm.go(cm.i)});
-['cmSkelA','cmSkelB','cmMirror'].forEach(id=>$(id).onchange=()=>cm.draw());
+['cmSkelA','cmSkelB','cmMirror','cmSyncAll'].forEach(id=>$(id).onchange=()=>cm.draw());
 
 function onMainChanged(){
   const has=!!S.A;['ck','cm'].forEach(p=>{$(p+'Empty').hidden=has;$(p+'Body').hidden=!has});
