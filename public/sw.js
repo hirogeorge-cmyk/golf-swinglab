@@ -1,5 +1,5 @@
 // Offline support: cache the heavy engine files once, keep the page itself fresh.
-const CACHE = 'swinglab-v8';
+const CACHE = 'swinglab-v9';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
   'vendor/vision_bundle.mjs', 'vendor/vision_wasm_internal.js',
   'wasm/vision_wasm_internal.wasm', 'model/pose_landmarker.wasm'];

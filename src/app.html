@@ -443,6 +443,11 @@ function analyze(sw=S,cfg=mainCfg()){
     const base=raw.slice(Math.max(0,adr-8),adr+1).sort((x,y)=>x-y);const m=base[base.length>>1];
     return smooth(raw.map(v=>-tdir*deg(v-m)));};
   const shT=turn3d(lead.s,trail.s), hpT=turn3d(lead.h,trail.h);
+  // Down-the-line: at the top the back faces the camera and both shoulders are visible, so the apparent
+  // shoulder width (vs. the body's real width from the height setting) gives the turn: sin(turn) = width / full width.
+  const dtlTurn=(a,b,frac)=>{if(view!=='dtl')return null;const Wf=heightCm*frac;
+    const ang=F.map(f=>deg(Math.asin(clamp(Math.abs(f.p[a][0]-f.p[b][0])*cm/Wf,0,1))));const b0=ang[adr];return smooth(ang.map(v=>Math.max(0,v-b0)))};
+  const shD=dtlTurn(11,12,0.21), hpD=dtlTurn(23,24,0.105);
   const spine=F.map(f=>{const h=mid(f.p[23],f.p[24]),s=mid(f.p[11],f.p[12]);const a=deg(Math.atan2(s[0]-h[0],-(s[1]-h[1])));return view==='face'?-tdir*a:tdir*a;});
   const leadElbow=F.map(f=>angleAt(f.p[lead.s],f.p[lead.e],f.p[lead.w]));
   const trailKnee=F.map(f=>angleAt(f.p[trail.h],f.p[trail.k],f.p[trail.a]));
@@ -460,7 +465,7 @@ function analyze(sw=S,cfg=mainCfg()){
   const manTurn=(a,b)=>{const ed=sw.edits||{},w0=(F[adr].p[a][0]-F[adr].p[b][0])*tdir;
     return F.map((f,i)=>i===adr?0:(ed[i]&&(ed[i][a]||ed[i][b])&&view==='face'?deg(Math.acos(clamp((f.p[a][0]-f.p[b][0])*tdir/(w0||1),-1,1))):null))};
   const shM=manTurn(lead.s,trail.s), hpM=manTurn(lead.h,trail.h);
-  sw.A={topHi,shM,hpM,valid,P,cm,tdir,lead,trail,view,shT,hpT,spine,leadElbow,trailKnee,head,headSide,headDown,hipX,handH,speed,hands,
+  sw.A={shD,hpD,topHi,shM,hpM,valid,P,cm,tdir,lead,trail,view,shT,hpT,spine,leadElbow,trailKnee,head,headSide,headDown,hipX,handH,speed,hands,
     back,down,pause,tempo:down>0?back/down:0,peak:speed[pk],pk,headR:6/cm,h0,
     crop:(()=>{const seg=[];for(let i=Math.max(0,adr-10);i<=adr;i++){const q=F[i].p,sm=mid(q[11],q[12]),hm=mid(q[23],q[24]);
         seg.push(dist(q[0],sm)+dist(sm,hm)+(dist(q[23],q[25])+dist(q[24],q[26]))/2+(dist(q[25],q[27])+dist(q[26],q[28]))/2)}
@@ -492,8 +497,9 @@ function renderPanel(){
   if(face){const mm=arr=>[P[1],P[4],P[7]].map(i=>arr[i]==null?'–':f0(arr[i]));
     rows.push(['肩の回転（マーカー修正）','°',mm(A.shM),'トップで両肩を修正すると計算']);
     rows.push(['腰の回転（マーカー修正）','°',mm(A.hpM),'トップで腰を修正すると計算']);}
-  rows.push(['肩の回転（参考値）','°',at(A.shT),'1台のカメラでは実際より小さく出ます']);
-  rows.push(['腰の回転（参考値）','°',at(A.hpT),'1台のカメラでは実際より小さく出ます']);
+  if(!face){rows.push(['肩の回転（後方撮影から推定）','°',at(A.shD),'トップ 80〜90°・最大90°まで']);rows.push(['腰の回転（後方撮影から推定）','°',at(A.hpD),'トップ 35〜50°']);}
+  else{rows.push(['肩の回転（参考値）','°',at(A.shT),'正面撮影では実際より小さく出ます']);
+  rows.push(['腰の回転（参考値）','°',at(A.hpT),'正面撮影では実際より小さく出ます']);}
   if(face){
     rows.push(['頭の左右移動','cm',at(A.headSide,f1),'後ろ足側へ + ／ 10 cm以内']);
     rows.push(['頭の上下移動','cm',at(A.headDown,f1),'沈み込み + ／ 5 cm以内']);
@@ -510,6 +516,9 @@ function renderPanel(){
     rows.map(r=>`<tr><td>${r[0]}<span class="ref">${r[3]}</span></td>${r[2].map(v=>`<td class="num">${v}<small style="font-size:12px;color:var(--muted)"> ${r[1]}</small></td>`).join('')}</tr>`).join('')+'</tbody>';
 
   const D=[];
+  if(!face&&A.shD){const sh=A.shD[P[4]],xf=sh-A.hpD[P[4]];
+    D.push({s:sh>=80?'good':sh>=65?'warn':'bad',t:`トップの肩の回転 ${f0(sh)}°（後方撮影から推定）`,d:sh>=80?'十分な肩の回転ができています。':'肩の回転が浅めです。左肩をあごの下まで入れ、背中が目標を向くまで回しましょう。',i:P[4]});
+    D.push({s:xf>=30?'good':xf>=20?'warn':'bad',t:`捻転差 ${f0(xf)}°（後方撮影から推定）`,d:xf>=30?'上半身と下半身の捻転差が作れています。':'腰が回りすぎている、または肩の回転が浅い状態です。',i:P[4]});}
   if(face&&A.shM[P[4]]!=null){const sh=A.shM[P[4]];
     D.push({s:sh>=85?'good':sh>=70?'warn':'bad',t:`トップの肩の回転 ${f0(sh)}°（マーカー修正）`,d:sh>=85?'十分な肩の回転ができています。':'肩の回転が浅めです。左肩をあごの下まで入れ、背中が目標を向くまで回しましょう。',i:P[4]});
     if(A.hpM[P[4]]!=null){const xf=sh-A.hpM[P[4]];D.push({s:xf>=35?'good':xf>=20?'warn':'bad',t:`捻転差 ${f0(xf)}°（マーカー修正）`,d:xf>=35?'上半身と下半身の捻転差がしっかり作れています。':'腰が回りすぎている、または肩の回転が浅い状態です。',i:P[4]});}}
