@@ -67,7 +67,13 @@ input[type=number]{width:76px}
 .bar{width:min(280px,80%);height:6px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden}
 .bar i{display:block;height:100%;width:0;background:#5BC487;transition:width .15s}
 .transport{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.transport input[type=range]{flex:1 1 180px;accent-color:var(--accent);min-width:0}
+.transport input[type=range]{display:none}
+.strips{display:flex;flex-direction:column;gap:4px}
+.strip-label{font-size:11.5px;color:var(--muted);font-weight:700}
+.strip{position:relative;height:64px;border-radius:10px;overflow:hidden;background:var(--stage);touch-action:none;cursor:pointer;user-select:none;-webkit-user-select:none}
+.strip canvas{display:block;width:100%;height:100%}
+.strip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#cmStripM{height:48px;cursor:default}
 .time{font-family:var(--f-display);font-size:17px;font-variant-numeric:tabular-nums;min-width:96px;text-align:right;color:var(--muted)}
 .icon-btn{width:38px;justify-content:center;padding:0}
 .phases{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
@@ -217,7 +223,6 @@ body.noscroll{overflow:hidden}
   .icon-btn{width:48px}
   select,input[type=number]{font-size:16px;min-height:44px}
   .transport{display:grid;grid-template-columns:48px minmax(0,1fr) 48px 84px;gap:8px;align-items:center}
-  .transport input[type=range]{grid-column:1/-1;order:-1;height:36px;width:100%}
   .transport .time{grid-column:1/-1;order:-2;text-align:left;min-width:0;font-size:16px}
   .phases{gap:5px}
   .phase{padding:7px 6px;min-height:52px}
@@ -329,7 +334,8 @@ body.noscroll{overflow:hidden}
       </div>
       <div class="busy" id="busy" hidden><div id="busyText">準備中…</div><div class="bar"><i id="busyBar"></i></div></div>
     </div>
-    <div class="transport">
+    <div class="strips"><div class="strip" id="mainStrip" role="slider" tabindex="0" aria-label="フレーム位置（なぞって移動）"><canvas></canvas></div></div>
+<div class="transport">
       <button class="btn icon-btn" id="prev" aria-label="1コマ戻る">◀︎</button>
       <button class="btn play" id="play">再生</button>
       <button class="btn icon-btn" id="next" aria-label="1コマ進む">▶︎</button>
@@ -384,7 +390,8 @@ body.noscroll{overflow:hidden}
     <figure class="pane"><figcaption><span>元動画</span></figcaption><div class="stage2"><canvas id="ckRaw"></canvas></div></figure>
     <figure class="pane"><figcaption><span>解析</span></figcaption><div class="stage2"><canvas id="ckAna"></canvas></div></figure>
   </div>
-  <div class="transport">
+  <div class="strips"><div class="strip" id="ckStrip" role="slider" tabindex="0" aria-label="フレーム位置（なぞって移動）"><canvas></canvas></div></div>
+<div class="transport">
     <button class="btn icon-btn" id="ckPrev" aria-label="1コマ戻る">◀︎</button>
     <button class="btn play" id="ckPlay">再生</button>
     <button class="btn icon-btn" id="ckNext" aria-label="1コマ進む">▶︎</button>
@@ -414,7 +421,8 @@ body.noscroll{overflow:hidden}
     <figure class="pane"><figcaption><span>自分</span></figcaption>
       <div class="stage2"><canvas id="cmB"></canvas></div></figure>
   </div>
-  <div class="transport">
+  <div class="strips"><div class="strip-label">お手本</div><div class="strip" id="cmStripM"><canvas></canvas></div><div class="strip-label">自分</div><div class="strip" id="cmStrip" role="slider" tabindex="0" aria-label="フレーム位置（なぞって移動）"><canvas></canvas></div></div>
+<div class="transport">
     <button class="btn icon-btn" id="cmPrev" aria-label="1コマ戻る">◀︎</button>
     <button class="btn play" id="cmPlay">再生</button>
     <button class="btn icon-btn" id="cmNext" aria-label="1コマ進む">▶︎</button>
@@ -783,8 +791,46 @@ const EDIT_J=[0,11,12,13,14,15,16,23,24,25,26,27,28];
 let editMode=false,dragJ=null;
 const mainOpts=()=>({edit:editMode,video:false,skel:$('tSkel').checked,path:$('tPath').checked,head:$('tHead').checked,spine:$('tSpine').checked});
 function drawOverlay(){drawSwing(ov,S,S.i,mainOpts())}
+/* ---------- filmstrip (frame thumbnails you can scrub) ---------- */
+const THUMBS=30;
+function grabThumb(v,W,H){const h=200,w=Math.max(1,Math.round(h*W/H)),c=document.createElement('canvas');c.width=w;c.height=h;try{c.getContext('2d').drawImage(v,0,0,w,h)}catch(e){}return c}
+function drawStrip(el,sw,t0,t1,tCur,opts={}){
+  if(!el||!sw||!sw.A)return;const cv=el.querySelector('canvas'),dpr=window.devicePixelRatio||1,w=el.clientWidth,h=el.clientHeight;if(!w)return;
+  if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr)}
+  const x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.fillStyle='#0E1410';x.fillRect(0,0,w,h);
+  const th=sw.thumbs||[],span=Math.max(1e-6,t1-t0);
+  if(th.length){
+    // crop each thumbnail to the golfer (same box as the side-by-side views) so the pose is readable
+    const c0=th[0].c,k0=c0.height/sw.H,cr=sw.A.crop;
+    let sx=0,sy=0,sW=c0.width,sH=c0.height;
+    if(cr){sH=Math.min(c0.height,cr.h*0.72*k0);sW=Math.min(c0.width,sH*0.75);sx=clamp((cr.x+cr.w/2)*k0-sW/2,0,c0.width-sW);sy=clamp((cr.y+cr.h*0.22)*k0,0,c0.height-sH)}
+    const tw=h*sW/sH,n=Math.max(1,Math.round(w/tw));
+    for(let k=0;k<n;k++){const tm=t0+(k+0.5)/n*span;let b=th[0];for(const q of th)if(Math.abs(q.t-tm)<Math.abs(b.t-tm))b=q;
+      x.drawImage(b.c,sx,sy,sW,sH,k*w/n,0,w/n+0.5,h);}
+    x.fillStyle='rgba(0,0,0,.12)';for(let k=1;k<n;k++)x.fillRect(Math.round(k*w/n),0,1,h);}
+  const X=t=>clamp((t-t0)/span,0,1)*w;
+  // phase marks
+  x.font='700 11px "Barlow Condensed", system-ui, sans-serif';x.textBaseline='top';x.textAlign='center';
+  let lastLab=-1e9;[1,4,7,10].forEach(k=>{const t=sw.frames[sw.A.P[k]].t;if(t<t0||t>t1)return;const px=Math.round(X(t))+.5;
+    x.fillStyle='rgba(255,201,77,.95)';x.fillRect(px-0.5,0,1.5,h);const lab='P'+k,tw2=x.measureText(lab).width+8;if(px-lastLab<tw2+2)return;lastLab=px;
+    x.fillStyle='rgba(14,20,16,.85)';x.fillRect(px-tw2/2,0,tw2,15);x.fillStyle='#FFC94D';x.fillText(lab,px,2)});
+  // playhead
+  const px=X(tCur);x.fillStyle='rgba(0,0,0,.35)';x.fillRect(px-3,0,6,h);x.fillStyle='#FFFFFF';x.fillRect(px-1.5,0,3,h);
+  x.beginPath();x.arc(px,h-7,6,0,7);x.fill();
+  el.setAttribute('aria-valuetext',((tCur-(sw.frames[sw.A.P[1]].t))/sw.cfg.slow).toFixed(2)+' 秒');
+}
+function bindStrip(el,getRange,onSeek){
+  const at=ev=>{const r=el.getBoundingClientRect(),[t0,t1]=getRange();return t0+clamp((ev.clientX-r.left)/r.width,0,1)*(t1-t0)};
+  let down=false;
+  el.addEventListener('pointerdown',ev=>{down=true;el.setPointerCapture(ev.pointerId);onSeek(at(ev));ev.preventDefault()});
+  el.addEventListener('pointermove',ev=>{if(down)onSeek(at(ev))});
+  const up=()=>{down=false};el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);
+}
+// show the swing itself (just before address to just after the finish) so each thumbnail covers a useful moment
+const mainRange=()=>{const F=S.frames,ph=S.A.P,sl=S.cfg.slow;return [F[nearest(F[ph[1]].t-0.4*sl)].t,F[nearest(F[ph[10]].t+0.6*sl)].t]};
+bindStrip($('mainStrip'),mainRange,t=>{if(!S.A)return;stop();seek(nearest(t))});
 function renderFrame(){
-  drawOverlay();drawCharts();
+  drawOverlay();drawCharts();{const [a,b]=mainRange();drawStrip($('mainStrip'),S,a,b,S.frames[S.i].t)}
   $('scrub').value=S.i;$('time').textContent=(S.frames[S.i].t/(+$('slow').value)).toFixed(2)+' s';
   const P=S.A.P;let cur=null;for(const k of [1,4,7,10]) if(S.i>=P[k])cur=k;
   $('phases').querySelectorAll('.phase').forEach((b,j)=>b.classList.toggle('on',[1,4,7,10][j]===cur));
@@ -864,6 +910,7 @@ async function detectVideo(file,v,prog,alive){
   // (requestVideoFrameCallback). Seeks are not frame-accurate in every browser/codec; repeated
   // frames are skipped so they can't fake a sudden jump in hand speed.
   const rvfc='requestVideoFrameCallback' in HTMLVideoElement.prototype;
+  const thumbs=[];let nextThumb=0;
   const frames=[];const fps=dur<=6?60:FPS;const n=Math.floor(dur*fps);let lastMT=-1;
   for(let k=0;k<=n;k++){
     if(!alive())return null;
@@ -874,9 +921,10 @@ async function detectVideo(file,v,prog,alive){
     if(shown){const r=await Promise.race([shown,sleep(150).then(()=>null)]);if(r==null){if(k>0)continue}else mt=r}
     if(mt<=lastMT+0.001)continue;
     lastMT=mt;lmTs+=17;frames.push(toFrame(mt,lm.detectForVideo(v,lmTs)));
+    if(mt>=nextThumb){thumbs.push({t:mt,c:grabThumb(v,W,H)});nextThumb=mt+dur/THUMBS}
     if(k%3===0)prog(`骨格を検出中… <b>${Math.round(k/n*100)}%</b><br><small>${k} / ${n} コマ</small>`,0.2+0.8*k/n);
   }
-  return {frames,W,H,dur,full:v.duration};
+  return {frames,W,H,dur,full:v.duration,thumbs};
 }
 let runId=0;
 async function analyzeFile(file){
@@ -886,7 +934,7 @@ async function analyzeFile(file){
     S.A=null;setMainUI('processing');location.hash==='#analyze'||!location.hash?null:(location.hash='#analyze');
     const r=await detectVideo(file,video,(t,p)=>busy(t,p),()=>my===runId);
     if(!r)return;
-    S.W=r.W;S.H=r.H;S.source='video';S.video=video;S.name=file.name;layoutStage();
+    S.thumbs=r.thumbs;S.W=r.W;S.H=r.H;S.source='video';S.video=video;S.name=file.name;layoutStage();
     S.edits={};S.orig={};S.lockP=null;if(editMode)setEdit(false);
     S.frames=prepare(r.frames,S);S.i=0;analyze();
     if(!S.A.valid)throw new Error('スイングの区間を特定できませんでした。アドレスからフィニッシュまで映っているか確認してください。');
@@ -934,7 +982,7 @@ function makePlayer(pfx,render){
   const P={i:0,playing:false,busy:false,dirty:false}, el=k=>$(pfx+k);
   P.n=()=>S.frames.length;
   P.range=()=>{if(!el('Fit').checked)return [0,P.n()-1];const F=S.frames,ph=S.A.P,sl=S.cfg.slow;return [nearest(F[ph[1]].t-0.4*sl),nearest(F[ph[10]].t+0.6*sl)]};
-  P.ui=()=>{const [lo,hi]=P.range();el('Scrub').min=lo;el('Scrub').max=hi;el('Scrub').value=P.i;el('Time').textContent=(S.frames[P.i].t/S.cfg.slow).toFixed(2)+' s';
+  P.ui=()=>{const [lo,hi]=P.range();drawStrip(el('Strip'),S,S.frames[lo].t,S.frames[hi].t,S.frames[P.i].t);if(P.onUi)P.onUi(P.i);el('Scrub').min=lo;el('Scrub').max=hi;el('Scrub').value=P.i;el('Time').textContent=(S.frames[P.i].t/S.cfg.slow).toFixed(2)+' s';
     const ph=S.A.P;let cur=null;for(const k of [1,4,7,10]) if(P.i>=ph[k])cur=k;
     el('Phases').querySelectorAll('.phase').forEach((b,j)=>b.classList.toggle('on',[1,4,7,10][j]===cur));};
   P.draw=async()=>{if(P.busy){P.dirty=true;return}P.busy=true;try{do{P.dirty=false;await render(P.i)}while(P.dirty)}catch(e){console.error(e)}finally{P.busy=false}};
@@ -952,6 +1000,7 @@ function makePlayer(pfx,render){
   el('Prev').onclick=()=>{P.stop();P.go(P.i-1)};el('Next').onclick=()=>{P.stop();P.go(P.i+1)};
   el('Scrub').oninput=e=>{P.stop();P.go(+e.target.value)};
   el('Fit').onchange=()=>P.go(P.i);
+  bindStrip(el('Strip'),()=>{const [lo,hi]=P.range();return [S.frames[lo].t,S.frames[hi].t]},t=>{if(!S.A)return;P.stop();P.go(nearest(t))});
   return P;
 }
 const lineOpts=on=>{const b=mainOpts();return on?{skel:true,path:true,head:b.head,spine:b.spine}:{}};
@@ -975,6 +1024,8 @@ function mapIdx(i){
   else{let g=1;while(g<3&&t>ka[g+1])g++;const u=(t-ka[g])/((ka[g+1]-ka[g])||1);tb=kb[g]+u*(kb[g+1]-kb[g]);}
   return nearest(clamp(tb,kb[0],kb[5]),M);
 }
+function modelRange(){const F=M.frames,ph=M.A.P,sl=M.cfg.slow;if(!$('cmFit').checked)return [F[0].t,F[F.length-1].t];
+  return [F[nearest(F[ph[1]].t-0.4*sl,M)].t,F[nearest(F[ph[10]].t+0.6*sl,M)].t]}
 const cm=makePlayer('cm',async i=>{
   $('mEmpty').hidden=!!M.A;
   if(!M.A){await seekVid(S,S.frames[i].t);const c=$('cmA');c.width=600;c.height=800;c.getContext('2d').clearRect(0,0,600,800);drawSwing($('cmB'),S,i,{video:true,fit:$('cmFit').checked,...lineOpts($('cmSkelB').checked)});return}
@@ -1003,7 +1054,7 @@ function renderCmp(){
 let mRun=0;
 $('mFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!isVideoFile(file))return;const my=++mRun;cm.stop();
   try{const r=await detectVideo(file,M.video,(t,p)=>busy(t,p,'busyM'),()=>my===mRun);if(!r)return;
-    M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());
+    M.thumbs=r.thumbs;M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());
     if(!M.A.valid)throw new Error('お手本動画のスイング区間を特定できませんでした。アドレスからフィニッシュまで映っている動画を選んでください。');
     busy(null,0,'busyM');
     $('cmNote').innerHTML=`お手本：<b>${M.name.replace(/[<>&]/g,'')}</b>　自分：<b id="cmName"></b>　人物の大きさと立ち位置をそろえ、始動の瞬間をそろえて実際の速さで再生します。`;
@@ -1012,6 +1063,7 @@ $('mFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(
     $('closeErrM').onclick=()=>{busy(null,0,'busyM');if(!M.A?.valid){M.A=null;renderCmp();cm.go(cm.i)}}}
 };
 ['mHand','mView','mHeight','mSlow'].forEach(id=>$(id).onchange=()=>{if(!M.A)return;analyze(M,mCfg());renderCmp();if(S.A)cm.go(cm.i)});
+cm.onUi=i=>{const el=$('cmStripM');el.parentElement.querySelectorAll('.strip-label').forEach(l=>l.hidden=!M.A);el.hidden=!M.A;if(!M.A)return;const [a,b]=modelRange();drawStrip(el,M,a,b,M.frames[mapIdx(i)].t)};
 ['cmSkelA','cmSkelB','cmMirror','cmSyncAll'].forEach(id=>$(id).onchange=()=>cm.draw());
 
 /* ---------- export (share the comparison) ---------- */
