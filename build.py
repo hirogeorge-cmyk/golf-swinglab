@@ -5,6 +5,7 @@ app = (root / "src/app.html").read_text(encoding="utf-8")
 # use self-hosted MediaPipe files instead of the CDN
 app = app.replace("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs", "./vendor/vision_bundle.mjs")
 app = app.replace("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/vision_wasm_internal.js", "./vendor/vision_wasm_internal.js")
+app = app.replace("https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.1/build/mp4-muxer.js", "./vendor/mp4-muxer.js")
 app = app.replace("const {PoseLandmarker}=await import(VISION_URL);", "const {PoseLandmarker}=await import(new URL(VISION_URL,location.href).href);")
 app = app.replace("wasmLoaderPath:WASM_LOADER", "wasmLoaderPath:new URL(WASM_LOADER,location.href).href")
 head = """<!doctype html>

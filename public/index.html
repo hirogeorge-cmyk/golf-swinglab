@@ -139,6 +139,9 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .view>.transport,.view>.phases{margin-bottom:10px}
 .cmp-head .settings{margin-top:14px}
 .cmp-table{margin-top:18px}
+.exportbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px}
+.exportbar .btn:disabled{opacity:.55;cursor:default}
+.export-msg{font-size:12.5px;color:var(--muted)}
 .fitbar{margin-bottom:10px;color:var(--ink)}
 .editbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .editbar .btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -318,6 +321,11 @@ td.diff b{color:var(--ink);font-weight:600}
     <span class="time" id="cmTime">0.00 s</span>
   </div>
   <div class="phases" id="cmPhases"></div>
+  <div class="exportbar">
+    <button class="btn primary" id="cmSaveVid">比較動画を保存（MP4）</button>
+    <button class="btn" id="cmSaveImg">この瞬間を画像で保存</button>
+    <span class="export-msg" id="cmExportMsg" role="status"></span>
+  </div>
   <div class="cmp-table">
     <h2>数値の比較 <small id="cmWarn"></small></h2>
     <div class="tbl-wrap"><table id="cmTbl"></table></div>
@@ -883,6 +891,82 @@ $('mFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(
 };
 ['mHand','mView','mHeight','mSlow'].forEach(id=>$(id).onchange=()=>{if(!M.A)return;analyze(M,mCfg());renderCmp();if(S.A)cm.go(cm.i)});
 ['cmSkelA','cmSkelB','cmMirror','cmSyncAll'].forEach(id=>$(id).onchange=()=>cm.draw());
+
+/* ---------- export (share the comparison) ---------- */
+const MUXER_URL='./vendor/mp4-muxer.js';
+let muxerP=null;
+const loadMuxer=()=>muxerP||(muxerP=new Promise((res,rej)=>{if(window.Mp4Muxer)return res(window.Mp4Muxer);const sc=document.createElement('script');sc.src=MUXER_URL;sc.onload=()=>res(window.Mp4Muxer);sc.onerror=()=>{muxerP=null;rej(new Error('load'))};document.head.appendChild(sc)}));
+const dlP=(window.claude&&window.claude.use)?window.claude.use('downloads').catch(()=>null):Promise.resolve(undefined);
+async function offerFile(name,blob){
+  const dl=await dlP;
+  if(dl){try{await dl.save({filename:name,data:blob});return 'saved'}catch(e){return e&&e.code||'error'}}
+  if(dl===null)return 'unavailable';
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),60000);return 'saved';
+}
+const OUT_W=1200,OUT_H=920,PANE_W=590,PANE_H=786,TOP=58;
+const tmpA=document.createElement('canvas'),tmpB=document.createElement('canvas');
+async function composeFrame(i,out){
+  const j=M.A?mapIdx(i):null;
+  await Promise.all([seekVid(S,S.frames[i].t),M.A?seekVid(M,M.frames[j].t):null]);
+  const fit=$('cmFit').checked;
+  if(M.A)drawSwing(tmpA,M,j,{video:true,fit,mirror:$('cmMirror').checked,...lineOpts($('cmSkelA').checked)});
+  drawSwing(tmpB,S,i,{video:true,fit,...lineOpts($('cmSkelB').checked)});
+  const x=out.getContext('2d');x.fillStyle='#0E1410';x.fillRect(0,0,OUT_W,OUT_H);
+  const put=(c,ox)=>{const k=Math.min(PANE_W/c.width,PANE_H/c.height),w=c.width*k,h=c.height*k;x.drawImage(c,ox+(PANE_W-w)/2,TOP+(PANE_H-h)/2,w,h)};
+  if(M.A)put(tmpA,7);put(tmpB,OUT_W/2+3);
+  x.fillStyle='#E9F0EA';x.font='700 28px "Noto Sans JP", sans-serif';x.textBaseline='middle';x.textAlign='left';
+  x.fillText('お手本',16,TOP/2);x.fillText('自分',OUT_W/2+12,TOP/2);
+  x.textAlign='right';x.fillStyle='rgba(233,240,234,.55)';x.font='600 22px "Barlow Condensed", sans-serif';x.fillText('SWINGLAB',OUT_W-16,TOP/2);
+  const sec=(S.frames[i].t-S.frames[S.A.P[1]].t)/S.cfg.slow;
+  let ph='';for(const [k,l] of [[1,'アドレス'],[4,'トップ'],[7,'インパクト'],[10,'フィニッシュ']]) if(i>=S.A.P[k])ph=`P${k} ${l}`;
+  x.textAlign='left';x.fillStyle='#E9F0EA';x.font='600 24px "Noto Sans JP", sans-serif';x.textBaseline='middle';
+  x.fillText(`始動から ${sec>=0?'+':''}${sec.toFixed(2)} 秒　${ph}`,16,TOP+PANE_H+(OUT_H-TOP-PANE_H)/2);
+  x.textAlign='right';x.fillStyle='rgba(233,240,234,.7)';x.font='500 20px "Noto Sans JP", sans-serif';
+  x.fillText(`テンポ 自分 ${f1(S.A.tempo)}:1${M.A?'　お手本 '+f1(M.A.tempo)+':1':''}`,OUT_W-16,TOP+PANE_H+(OUT_H-TOP-PANE_H)/2);
+}
+const stamp=()=>{const d=new Date(),z=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`};
+const exportMsg=t=>{$('cmExportMsg').textContent=t};
+const saveMsg=r=>r==='saved'?'保存しました。':r==='declined'?'保存を取りやめました。':r==='unavailable'?'この画面ではファイルを保存できません。':'保存できませんでした（'+r+'）。';
+let exporting=false;
+$('cmSaveImg').onclick=async()=>{if(exporting||!S.A)return;cm.stop();exporting=true;
+  try{const out=document.createElement('canvas');out.width=OUT_W;out.height=OUT_H;await composeFrame(cm.i,out);
+    const blob=await new Promise(r=>out.toBlob(r,'image/png'));exportMsg(saveMsg(await offerFile(`swing-compare-${stamp()}.png`,blob)));}
+  catch(e){console.error(e);exportMsg('画像を作れませんでした。')}finally{exporting=false;cm.draw()}};
+$('cmSaveVid').onclick=async()=>{
+  if(exporting||!S.A)return;cm.stop();exporting=true;['cmSaveVid','cmSaveImg'].forEach(id=>$(id).disabled=true);
+  const out=document.createElement('canvas');out.width=OUT_W;out.height=OUT_H;
+  const FPS_OUT=30,rate=+$('cmRate').value,[lo,hi]=cm.range(),t0=S.frames[lo].t,t1=S.frames[hi].t;
+  const step=rate*S.cfg.slow/FPS_OUT,N=Math.max(1,Math.floor((t1-t0)/step)+1);
+  try{
+    let blob,ext;
+    const cfg={codec:'avc1.420028',width:OUT_W,height:OUT_H,bitrate:6e6,framerate:FPS_OUT};
+    const canEnc=window.VideoEncoder&&(await VideoEncoder.isConfigSupported(cfg).catch(()=>({supported:false}))).supported;
+    if(canEnc){
+      const MM=await loadMuxer();
+      const muxer=new MM.Muxer({target:new MM.ArrayBufferTarget(),video:{codec:'avc',width:OUT_W,height:OUT_H},fastStart:'in-memory'});
+      let encErr=null;const enc=new VideoEncoder({output:(c,m)=>muxer.addVideoChunk(c,m),error:e=>{encErr=e}});enc.configure(cfg);
+      for(let k=0;k<N;k++){
+        await composeFrame(nearest(t0+k*step),out);
+        const vf=new VideoFrame(out,{timestamp:Math.round(k*1e6/FPS_OUT),duration:Math.round(1e6/FPS_OUT)});
+        enc.encode(vf,{keyFrame:k%FPS_OUT===0});vf.close();
+        while(enc.encodeQueueSize>4)await sleep(5);
+        if(encErr)throw encErr;
+        if(k%3===0)exportMsg(`動画を作成中… ${Math.round(k/N*100)}%`);
+      }
+      await enc.flush();muxer.finalize();blob=new Blob([muxer.target.buffer],{type:'video/mp4'});ext='mp4';
+    }else{
+      // fallback: record the canvas, pausing the recorder while each frame is prepared
+      const stream=out.captureStream(FPS_OUT),mime=['video/webm;codecs=vp9','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
+      const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:6e6}),parts=[];rec.ondataavailable=e=>e.data.size&&parts.push(e.data);
+      await composeFrame(nearest(t0),out);rec.start();rec.pause();
+      for(let k=0;k<N;k++){await composeFrame(nearest(t0+k*step),out);rec.resume();await sleep(1000/FPS_OUT);rec.pause();if(k%3===0)exportMsg(`動画を作成中… ${Math.round(k/N*100)}%`);}
+      await new Promise(r=>{rec.onstop=r;rec.stop()});blob=new Blob(parts,{type:'video/webm'});ext='webm';
+    }
+    exportMsg('保存の確認を表示しています…');
+    exportMsg(saveMsg(await offerFile(`swing-compare-${stamp()}.${ext}`,blob)));
+  }catch(e){console.error(e);exportMsg('動画を作れませんでした。ブラウザを最新にするか、Chrome でお試しください。')}
+  finally{exporting=false;['cmSaveVid','cmSaveImg'].forEach(id=>$(id).disabled=false);cm.go(cm.i)}
+};
 
 function onMainChanged(){
   const has=!!S.A;['ck','cm'].forEach(p=>{$(p+'Empty').hidden=has;$(p+'Body').hidden=!has});
