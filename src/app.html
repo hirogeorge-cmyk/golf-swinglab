@@ -258,7 +258,10 @@ body.noscroll{overflow:hidden}
       <p class="shelp">正面：体の正面から。後方：飛球線の真後ろから（肩・腰の回転を自動で推定できます）</p></div>
     <div class="sfield"><span class="slabel">身長</span><div class="stepper"><button data-step="-1" data-for="height" aria-label="1cm 低く">−</button><input id="height" type="number" inputmode="numeric" min="120" max="210" value="170"><span>cm</span><button data-step="1" data-for="height" aria-label="1cm 高く">＋</button></div></div>
     <div class="sfield"><span class="slabel">動画の速さ</span><div class="seg" data-for="slow"><button data-v="1">通常</button><button data-v="4">スロー 1/4</button><button data-v="8">スロー 1/8</button></div></div>
+    <div class="sfield"><span class="slabel">解析の精度</span><div class="seg" data-for="hq"><button data-v="1">高精度</button><button data-v="0">速さ優先</button></div>
+      <p class="shelp">高精度：トップで肩の位置を正しく追えます（初回に約55MBを読み込み、解析にも時間がかかります）。速さ優先：これまでの方式</p></div>
     <div class="hidden-selects" aria-hidden="true">
+      <select id="hq" tabindex="-1"><option value="1">高精度</option><option value="0">速さ優先</option></select>
       <select id="hand" tabindex="-1"><option value="R">右打ち</option><option value="L">左打ち</option></select>
       <select id="view" tabindex="-1"><option value="face">正面</option><option value="dtl">後方</option></select>
       <select id="slow" tabindex="-1"><option value="1">通常</option><option value="4">スロー 1/4</option><option value="8">スロー 1/8</option></select>
@@ -583,7 +586,14 @@ function analyze(sw=S,cfg=mainCfg()){
   const manTurn=(a,b)=>{const ed=sw.edits||{},w0=(F[adr].p[a][0]-F[adr].p[b][0])*tdir;
     return F.map((f,i)=>i===adr?0:(ed[i]&&(ed[i][a]||ed[i][b])&&view==='face'?deg(Math.acos(clamp((f.p[a][0]-f.p[b][0])*tdir/(w0||1),-1,1))):null))};
   const shM=manTurn(lead.s,trail.s), hpM=manTurn(lead.h,trail.h);
-  sw.A={shD,hpD,topHi,shM,hpM,valid,P,cm,tdir,lead,trail,view,shT,hpT,spine,leadElbow,trailKnee,head,headSide,headDown,hipX,handH,speed,hands,
+  // with RTMPose keypoints the face-on shoulder/hip line is reliable even at the top:
+  // turn = acos(horizontal width / width at address); a negative width (lines crossed) means more than 90°
+  const autoTurn=(a,b)=>{if(view!=='face'||!sw.rtm)return null;const bs=[];for(let i=Math.max(0,adr-8);i<=adr;i++)bs.push((F[i].p[a][0]-F[i].p[b][0])*tdir);bs.sort((x,y)=>x-y);const w0=bs[bs.length>>1]||1;
+    return smooth(F.map(f=>deg(Math.acos(clamp((f.p[a][0]-f.p[b][0])*tdir/w0,-1,1))))).map((v,i)=>i>=imp?-v:v)};
+  const shA=autoTurn(lead.s,trail.s),hpA=autoTurn(lead.h,trail.h);
+  const shF=shA?shA.map((v,i)=>shM[i]??v):shM, hpF=hpA?hpA.map((v,i)=>hpM[i]??v):hpM;
+  const shBest=shA?shF:(view==='dtl'?shD:shT), hpBest=hpA?hpF:(view==='dtl'?hpD:hpT);
+  sw.A={shA,hpA,shF,hpF,shBest,hpBest,shD,hpD,topHi,shM,hpM,valid,P,cm,tdir,lead,trail,view,shT,hpT,spine,leadElbow,trailKnee,head,headSide,headDown,hipX,handH,speed,hands,
     back,down,pause,tempo:down>0?back/down:0,peak:speed[pk],pk,headR:6/cm,h0,
     crop:(()=>{const seg=[];for(let i=Math.max(0,adr-10);i<=adr;i++){const q=F[i].p,sm=mid(q[11],q[12]),hm=mid(q[23],q[24]);
         seg.push(dist(q[0],sm)+dist(sm,hm)+(dist(q[23],q[25])+dist(q[24],q[26]))/2+(dist(q[25],q[27])+dist(q[26],q[28]))/2)}
@@ -612,11 +622,12 @@ function renderPanel(){
   $('viewNote').textContent=face?'正面からの推定値':'後方からの推定値';
   const rows=[];
   const at=(arr,fmt=f0)=>[P[1],P[4],P[7]].map(i=>fmt(arr[i]));
-  if(face){const mm=arr=>[P[1],P[4],P[7]].map(i=>arr[i]==null?'–':f0(arr[i]));
+  if(face&&A.shA){rows.push(['肩の回転','°',at(A.shF),'トップ 85〜100°／インパクトは開き（−）']);rows.push(['腰の回転','°',at(A.hpF),'トップ 35〜50°／インパクトは開き（−）']);}
+  else if(face){const mm=arr=>[P[1],P[4],P[7]].map(i=>arr[i]==null?'–':f0(arr[i]));
     rows.push(['肩の回転（マーカー修正）','°',mm(A.shM),'トップで両肩を修正すると計算']);
     rows.push(['腰の回転（マーカー修正）','°',mm(A.hpM),'トップで腰を修正すると計算']);}
   if(!face){rows.push(['肩の回転（後方撮影から推定）','°',at(A.shD),'トップ 80〜90°・最大90°まで']);rows.push(['腰の回転（後方撮影から推定）','°',at(A.hpD),'トップ 35〜50°']);}
-  else{rows.push(['肩の回転（参考値）','°',at(A.shT),'正面撮影では実際より小さく出ます']);
+  else if(!A.shA){rows.push(['肩の回転（参考値）','°',at(A.shT),'正面撮影では実際より小さく出ます']);
   rows.push(['腰の回転（参考値）','°',at(A.hpT),'正面撮影では実際より小さく出ます']);}
   if(face){
     rows.push(['頭の左右移動','cm',at(A.headSide,f1),'後ろ足側へ + ／ 10 cm以内']);
@@ -637,9 +648,9 @@ function renderPanel(){
   if(!face&&A.shD){const sh=A.shD[P[4]],xf=sh-A.hpD[P[4]];
     D.push({s:sh>=80?'good':sh>=65?'warn':'bad',t:`トップの肩の回転 ${f0(sh)}°（後方撮影から推定）`,d:sh>=80?'十分な肩の回転ができています。':'肩の回転が浅めです。左肩をあごの下まで入れ、背中が目標を向くまで回しましょう。',i:P[4]});
     D.push({s:xf>=30?'good':xf>=20?'warn':'bad',t:`捻転差 ${f0(xf)}°（後方撮影から推定）`,d:xf>=30?'上半身と下半身の捻転差が作れています。':'腰が回りすぎている、または肩の回転が浅い状態です。',i:P[4]});}
-  if(face&&A.shM[P[4]]!=null){const sh=A.shM[P[4]];
-    D.push({s:sh>=85?'good':sh>=70?'warn':'bad',t:`トップの肩の回転 ${f0(sh)}°（マーカー修正）`,d:sh>=85?'十分な肩の回転ができています。':'肩の回転が浅めです。左肩をあごの下まで入れ、背中が目標を向くまで回しましょう。',i:P[4]});
-    if(A.hpM[P[4]]!=null){const xf=sh-A.hpM[P[4]];D.push({s:xf>=35?'good':xf>=20?'warn':'bad',t:`捻転差 ${f0(xf)}°（マーカー修正）`,d:xf>=35?'上半身と下半身の捻転差がしっかり作れています。':'腰が回りすぎている、または肩の回転が浅い状態です。',i:P[4]});}}
+  if(face&&A.shF&&A.shF[P[4]]!=null){const sh=A.shF[P[4]],how=A.shM[P[4]]!=null?'マーカー修正':'自動';
+    D.push({s:sh>=85?'good':sh>=70?'warn':'bad',t:`トップの肩の回転 ${f0(sh)}°（${how}）`,d:sh>=85?'十分な肩の回転ができています。':'肩の回転が浅めです。左肩をあごの下まで入れ、背中が目標を向くまで回しましょう。',i:P[4]});
+    if(A.hpF&&A.hpF[P[4]]!=null){const xf=sh-A.hpF[P[4]];D.push({s:xf>=35?'good':xf>=20?'warn':'bad',t:`捻転差 ${f0(xf)}°（${how}）`,d:xf>=35?'上半身と下半身の捻転差がしっかり作れています。':'腰が回りすぎている、または肩の回転が浅い状態です。',i:P[4]});}}
   D.push({s:tempoState,t:`テンポ ${f1(A.tempo)} : 1`,d:tempoState==='good'?'バックスイングとダウンスイングの時間配分が理想に近いリズムです。':(A.tempo<2.6?'切り返しが早めです。トップで一瞬「間」をつくる意識で、バックスイングをゆったり上げましょう。':(A.pause>=0.15?`トップで約${A.pause.toFixed(2)}秒の「間」があります。毎回同じなら個性ですが、ばらつく場合は間を短くして 3〜3.5 : 1 を目指しましょう。`:'バックスイングに対してダウンスイングが速すぎる、またはバックスイングがゆっくりすぎます。3 : 1 前後を目指しましょう。')),i:P[4]});
   const hd=A.head[P[7]];
   D.push({s:hd<=5?'good':hd<=10?'warn':'bad',t:`インパクトでの頭の位置ずれ ${f1(hd)} cm`,d:hd<=5?'インパクトで頭がアドレスの位置に戻っており、軸が安定しています。':'インパクトで頭がアドレスの位置からずれています。基準円を意識してスイングしましょう。',i:P[7]});
@@ -674,7 +685,7 @@ function niceTicks(min,max,n=4){const span=(max-min)||1,s0=span/n,mag=10**Math.f
 function buildCharts(){
   const A=S.A, face=A.view==='face';
   const defs=[
-    {title:'肩と腰の回転（参考値・実際より小さく出ます）',unit:'°',series:[{label:'肩',v:A.shT,c:'--accent'},{label:'腰',v:A.hpT,c:'--accent-2',dash:true}]},
+    {title:A.shA||A.view==='dtl'?'肩と腰の回転':'肩と腰の回転（参考値・実際より小さく出ます）',unit:'°',series:[{label:'肩',v:A.shBest,c:'--accent'},{label:'腰',v:A.hpBest,c:'--accent-2',dash:true}]},
     face?{title:'頭の移動（左右）',unit:'cm',series:[{label:'頭',v:A.headSide,c:'--accent'}]}:{title:'前傾角',unit:'°',series:[{label:'前傾角',v:A.spine,c:'--accent'}]},
     {title:'手のスピード（低めに出ます）',unit:'m/s',series:[{label:'スピード',v:A.speed,c:'--accent'}]}
   ];
@@ -878,9 +889,53 @@ async function loadVideoFile(v,file){
 }
 const once=(el,ev)=>new Promise((res,rej)=>{const ok=()=>{cl();res()},ng=()=>{cl();rej(new Error('この動画を再生できませんでした。iPhoneのHEVC動画はSafariで開くか、カメラ設定「互換性優先」で撮影した動画でお試しください。'))};const cl=()=>{el.removeEventListener(ev,ok);el.removeEventListener('error',ng)};el.addEventListener(ev,ok);el.addEventListener('error',ng)});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+/* ---------- RTMPose (high-accuracy keypoints, Apache-2.0) ----------
+   MediaPipe finds the person; RTMPose-l then re-locates the 17 main joints. It keeps track of the
+   shoulders when the body turns away from the camera at the top, where MediaPipe loses them. */
+const ORT_JS='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.webgpu.min.js';
+const ORT_MJS='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort-wasm-simd-threaded.jsep.mjs';
+const ORT_WASM_PARTS=['ort/jsep.0.wasm','ort/jsep.1.wasm'];
+const RTM_PARTS=['model/rtm.0.wasm','model/rtm.1.wasm','model/rtm.2.wasm','model/rtm.3.wasm'];
+const COCO2MP=[0,2,5,7,8,11,12,13,14,15,16,23,24,25,26,27,28];
+const loadScript=src=>new Promise((res,rej)=>{if([...document.scripts].some(x=>x.src===src))return res();const sc=document.createElement('script');sc.src=src;sc.onload=res;sc.onerror=()=>rej(new Error('script'));document.head.appendChild(sc)});
+async function fetchParts(paths,onBytes){const bufs=[];let n=0;for(const pth of paths){const r=await fetch(new URL(pth,location.href));if(!r.ok)throw new Error('fetch '+pth);const b=new Uint8Array(await r.arrayBuffer());bufs.push(b);n+=b.length;onBytes&&onBytes(n)}
+  const out=new Uint8Array(n);let o=0;for(const b of bufs){out.set(b,o);o+=b.length}return out}
+let rtmP=null;
+function getRTM(prog=()=>{}){
+  if(rtmP)return rtmP;
+  rtmP=(async()=>{
+    prog('高精度エンジンを読み込み中…',0.16);
+    await loadScript(ORT_JS);const ort=window.ort;
+    ort.env.wasm.numThreads=1;ort.env.wasm.wasmPaths={mjs:ORT_MJS};
+    ort.env.wasm.wasmBinary=(await fetchParts(ORT_WASM_PARTS)).buffer;
+    const model=await fetchParts(RTM_PARTS,n=>prog(`高精度モデルを読み込み中… <b>${Math.round(n/55e6*100)}%</b><br><small>初回だけ約55MBを読み込みます</small>`,0.16+0.04*n/55e6));
+    let sess=null,ep='wasm';
+    if(navigator.gpu){try{sess=await ort.InferenceSession.create(model,{executionProviders:['webgpu']});ep='webgpu'}catch(e){console.warn('webgpu unavailable',e)}}
+    if(!sess)sess=await ort.InferenceSession.create(model,{executionProviders:['wasm']});
+    const cv=document.createElement('canvas');cv.width=192;cv.height=256;
+    return {ort,sess,ep,cv,ctx:cv.getContext('2d',{willReadFrequently:true}),buf:new Float32Array(3*256*192)};
+  })();
+  rtmP.catch(()=>{rtmP=null});
+  return rtmP;
+}
+// top-down inference on one person box (same pre/post-processing as the reference implementation)
+async function rtmInfer(R,src,bx){
+  const [x1,y1,x2,y2]=bx,cx=(x1+x2)/2,cy=(y1+y2)/2,ar=192/256;let bw=(x2-x1)*1.25,bh=(y2-y1)*1.25;if(bw>bh*ar)bh=bw/ar;else bw=bh*ar;
+  const c=R.ctx;c.fillStyle='#000';c.fillRect(0,0,192,256);c.drawImage(src,cx-bw/2,cy-bh/2,bw,bh,0,0,192,256);
+  const d=c.getImageData(0,0,192,256).data,N=192*256,b=R.buf;
+  for(let i=0;i<N;i++){const r=d[i*4],g=d[i*4+1],bl=d[i*4+2];b[i]=(bl-123.675)/58.395;b[N+i]=(g-116.28)/57.12;b[2*N+i]=(r-103.53)/57.375}
+  const out=await R.sess.run({input:new R.ort.Tensor('float32',b,[1,3,256,192])});
+  const sx=out.simcc_x.data,sy=out.simcc_y.data,K=17,WX=384,WY=512,kp=[];
+  for(let k=0;k<K;k++){let mx=-1e9,ix=0,my=-1e9,iy=0;
+    for(let j=0;j<WX;j++){const v=sx[k*WX+j];if(v>mx){mx=v;ix=j}}
+    for(let j=0;j<WY;j++){const v=sy[k*WY+j];if(v>my){my=v;iy=j}}
+    kp.push([ix/2/192*bw+cx-bw/2,iy/2/256*bh+cy-bh/2,Math.min(mx,my)]);}
+  return kp;
+}
 let lmTs=0;
 async function detectVideo(file,v,prog,alive){
   let lm=await getLandmarker(prog);
+  let rtm=null;if($('hq').value==='1'){try{rtm=await getRTM(prog)}catch(e){console.warn('RTMPose unavailable, using MediaPipe only',e)}}
   prog('動画を読み込み中…',0.2);
   await loadVideoFile(v,file);
   // some phones create the GPU engine but fail on the first frame: fall back to the CPU engine
@@ -904,11 +959,15 @@ async function detectVideo(file,v,prog,alive){
     let mt=t;
     if(shown){const r=await Promise.race([shown,sleep(150).then(()=>null)]);if(r==null){if(k>0)continue}else mt=r}
     if(mt<=lastMT+0.001)continue;
-    lastMT=mt;lmTs+=17;frames.push(toFrame(mt,lm.detectForVideo(v,lmTs)));
+    lastMT=mt;lmTs+=17;const fr=toFrame(mt,lm.detectForVideo(v,lmTs));
+    if(rtm&&fr.p){try{const xs=fr.p.map(q=>q[0]),ys=fr.p.map(q=>q[1]);let x1=Math.min(...xs),x2=Math.max(...xs),y1=Math.min(...ys),y2=Math.max(...ys);const h=y2-y1;
+      const kp=await rtmInfer(rtm,v,[x1-0.05*h,y1-0.12*h,x2+0.05*h,y2+0.03*h]);
+      COCO2MP.forEach((mi,ci)=>{if(kp[ci][2]>0.3)fr.p[mi]=[kp[ci][0],kp[ci][1],1]});fr.rtm=true}catch(e){console.warn(e)}}
+    frames.push(fr);
     if(mt>=nextThumb){thumbs.push({t:mt,c:grabThumb(v,W,H)});nextThumb=mt+dur/THUMBS}
-    if(k%3===0)prog(`骨格を検出中… <b>${Math.round(k/n*100)}%</b><br><small>${k} / ${n} コマ</small>`,0.2+0.8*k/n);
+    if(k%3===0)prog(`骨格を検出中${rtm?'（高精度）':''}… <b>${Math.round(k/n*100)}%</b><br><small>${k} / ${n} コマ</small>`,0.2+0.8*k/n);
   }
-  return {frames,W,H,dur,full:v.duration,thumbs};
+  return {frames,W,H,dur,full:v.duration,thumbs,rtm:frames.some(f=>f.rtm)};
 }
 let runId=0;
 async function analyzeFile(file){
@@ -918,7 +977,7 @@ async function analyzeFile(file){
     S.A=null;setMainUI('processing');location.hash==='#analyze'||!location.hash?null:(location.hash='#analyze');
     const r=await detectVideo(file,video,(t,p)=>busy(t,p),()=>my===runId);
     if(!r)return;
-    S.thumbs=r.thumbs;S.W=r.W;S.H=r.H;S.source='video';S.video=video;S.name=file.name;layoutStage();
+    S.thumbs=r.thumbs;S.rtm=r.rtm;S.W=r.W;S.H=r.H;S.source='video';S.video=video;S.name=file.name;layoutStage();
     S.edits={};S.orig={};S.lockP=null;if(editMode)setEdit(false);
     S.frames=prepare(r.frames,S);S.i=0;analyze();
     if(!S.A.valid)throw new Error('スイングの区間を特定できませんでした。アドレスからフィニッシュまで映っているか確認してください。');
@@ -1020,7 +1079,7 @@ const cm=makePlayer('cm',async i=>{
   drawSwing($('cmB'),S,i,{video:true,fit,...lineOpts($('cmSkelB').checked)});});
 function keyRows(A,mode){const P=A.P;const r=[
   ['テンポ',A.tempo,' : 1',1],['バックスイング',A.back,' s',2],['ダウンスイング',A.down,' s',2],['トップの間',A.pause,' s',2],
-  ['肩の回転（トップ・参考値）',A.shT[P[4]],'°',0],['腰の回転（トップ・参考値）',A.hpT[P[4]],'°',0],
+  [A.shA||A.view==='dtl'?'肩の回転（トップ）':'肩の回転（トップ・参考値）',A.shBest[P[4]],'°',0],[A.shA||A.view==='dtl'?'腰の回転（トップ）':'腰の回転（トップ・参考値）',A.hpBest[P[4]],'°',0],
   ['頭の沈み（トップ）',A.headDown[P[4]],' cm',1],['頭のずれ（インパクト）',A.head[P[7]],' cm',1]];
   if(mode==='face')r.push(['頭の横移動（トップ）',A.headSide[P[4]],' cm',1],['腰の移動（インパクト）',A.hipX[P[7]],' cm',1]);
   if(mode==='dtl')r.push(['前傾角の変化（P1→P7）',A.spine[P[7]]-A.spine[P[1]],'°',0],['腰のボール方向移動（P7）',A.hipX[P[7]],' cm',1]);
@@ -1038,7 +1097,7 @@ function renderCmp(){
 let mRun=0;
 $('mFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!isVideoFile(file))return;const my=++mRun;cm.stop();
   try{const r=await detectVideo(file,M.video,(t,p)=>busy(t,p,'busyM'),()=>my===mRun);if(!r)return;
-    M.thumbs=r.thumbs;M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());
+    M.thumbs=r.thumbs;M.rtm=r.rtm;M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());
     if(!M.A.valid)throw new Error('お手本動画のスイング区間を特定できませんでした。アドレスからフィニッシュまで映っている動画を選んでください。');
     busy(null,0,'busyM');
     $('cmNote').innerHTML=`お手本：<b>${M.name.replace(/[<>&]/g,'')}</b>　自分：<b id="cmName"></b>　人物の大きさと立ち位置をそろえ、始動の瞬間をそろえて実際の速さで再生します。`;
@@ -1150,8 +1209,8 @@ addEventListener('hashchange',()=>showView(location.hash.slice(1)));
 const SAMPLE_ME={turn:74,hip:44,headDx:-50,headSink:24}, SAMPLE_PRO={turn:98,hip:44,headDx:-10,headSink:3};
 function loadSample(){const s=makeSample(SAMPLE_ME);S.frames=prepare(s.frames,S);S.W=s.W;S.H=s.H;S.source='sample';S.name='サンプル';video.removeAttribute('src');video.load();
   layoutStage();analyze();renderPanel();S.i=S.A.P[4];renderFrame();onMainChanged();}
-try{const sv=JSON.parse(localStorage.getItem('swinglab-settings')||'{}');['hand','view','height','slow'].forEach(k=>{if(sv[k]!=null)$(k).value=sv[k]})}catch(e){}
-['hand','view','height','slow'].forEach(k=>$(k).addEventListener('change',()=>{try{localStorage.setItem('swinglab-settings',JSON.stringify(Object.fromEntries(['hand','view','height','slow'].map(x=>[x,$(x).value]))))}catch(e){}}));
+try{const sv=JSON.parse(localStorage.getItem('swinglab-settings')||'{}');['hand','view','height','slow','hq'].forEach(k=>{if(sv[k]!=null)$(k).value=sv[k]})}catch(e){}
+['hand','view','height','slow','hq'].forEach(k=>$(k).addEventListener('change',()=>{try{localStorage.setItem('swinglab-settings',JSON.stringify(Object.fromEntries(['hand','view','height','slow','hq'].map(x=>[x,$(x).value]))))}catch(e){}}));
 /* ---------- settings sheets ---------- */
 let openSheetEl=null;
 function syncSeg(){document.querySelectorAll('.seg').forEach(g=>{const v=$(g.dataset.for).value;g.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===v)))})}
