@@ -151,7 +151,8 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .hcard.sel{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
 .hc-main{all:unset;box-sizing:border-box;flex:1;display:flex;gap:12px;align-items:center;padding:8px;cursor:pointer;min-width:0}
 .hc-main:focus-visible{outline:2px solid var(--accent)}
-.hc-main img{width:66px;height:88px;object-fit:cover;border-radius:8px;background:var(--stage);flex:none}
+.hc-main img,.hc-ph{width:66px;height:88px;object-fit:cover;border-radius:8px;background:var(--stage);flex:none}
+.hc-ph{display:block;background:radial-gradient(circle at 50% 70%,rgba(201,168,106,.35) 0 7px,transparent 8px),var(--stage)}
 .hc-body{min-width:0;display:flex;flex-direction:column;gap:3px}
 .hc-date{font-family:var(--f-display);font-weight:700;font-size:20px;line-height:1.1}
 .hc-date small{font-family:var(--f-body);font-size:12px;font-weight:500;color:var(--muted);margin-left:4px}
@@ -1386,7 +1387,7 @@ async function saveHistory(sw,file){
     const sm=document.createElement('canvas');sm.width=180;sm.height=240;sm.getContext('2d').drawImage(pc,0,0,180,240);
     const rec={id:'sw_'+Date.now().toString(36),date:ymd(d),created:Date.now(),file:file.name||'',cfg:{...sw.cfg},W:sw.W,H:sw.H,rtm:!!sw.rtm,hw:sw.hw,
       frames:sw.frames.map(f=>({t:f.t,p:f.p,w:f.w})),thumbs:await Promise.all((sw.thumbs||[]).map(async th=>({t:th.t,blob:await canvasBlob(th.c,0.7)}))),
-      poster:await canvasBlob(sm,0.8),summary:summaryOf(sw),memo:''};
+      posterUrl:sm.toDataURL('image/jpeg',0.8),summary:summaryOf(sw),memo:''};
     await hPut(rec,file);await seekVid(sw,sw.frames[sw.i||0].t);if(sw===S&&curView==='analyze')renderFrame();sw.histId=rec.id;sw.label=fmtDate(rec.date).main;return rec;
   }catch(e){console.warn('history save failed',e);return null}
 }
@@ -1407,6 +1408,13 @@ async function openRecordMain(rec){
   $('notice').querySelector('strong').textContent='履歴';$('noticeText').textContent=`${fmtDate(rec.date).main} のスイングを開きました。${rec.memo?'メモ：'+rec.memo:''}`;
 }
 let histSel=null,posterUrls=[];
+const blobToDataURL=b=>new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>rej(fr.error);fr.readAsDataURL(b)});
+// older records kept the poster as a Blob; rebuild a data: URL from it (or from the stored frame thumbnails)
+async function makePosterUrl(r){
+  try{const src=r.poster||(r.thumbs&&r.thumbs.length?r.thumbs[Math.floor(r.thumbs.length*0.4)].blob:null);if(!src)return '';
+    const bm=await createImageBitmap(src);const c=document.createElement('canvas');c.width=180;c.height=240;const x=c.getContext('2d');
+    const k=Math.max(180/bm.width,240/bm.height),w=bm.width*k,h=bm.height*k;x.fillStyle='#060907';x.fillRect(0,0,180,240);x.drawImage(bm,(180-w)/2,(240-h)/2,w,h);bm.close&&bm.close();
+    return c.toDataURL('image/jpeg',0.8)}catch(e){console.warn('poster',e);return ''}}
 async function renderHistory(){
   let list=null;try{list=await hAll()}catch(e){}
   posterUrls.forEach(u=>URL.revokeObjectURL(u));posterUrls=[];
@@ -1414,10 +1422,11 @@ async function renderHistory(){
   list.sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.created);
   $('histEmpty').hidden=list.length>0;$('histCmpBtn').hidden=list.length<2;
   $('histList').classList.toggle('selecting',!!histSel);
-  $('histList').innerHTML=list.map(r=>{const u=r.poster?URL.createObjectURL(r.poster):'';u&&posterUrls.push(u);const f=fmtDate(r.date),sm=r.summary||{};
+  for(const r of list){if(!r.posterUrl){r.posterUrl=await makePosterUrl(r);if(r.posterUrl)hPatch(r.id,{posterUrl:r.posterUrl}).catch(()=>{})}}
+  $('histList').innerHTML=list.map(r=>{const u=r.posterUrl||'';const f=fmtDate(r.date),sm=r.summary||{};
     const st=[sm.tempo?`<span>テンポ <b>${f1(sm.tempo)}</b>:1</span>`:'',sm.sh!=null?`<span>肩 <b>${f0(sm.sh)}</b>°</span>`:'',sm.head!=null?`<span>頭 <b>${f1(sm.head)}</b>cm</span>`:''].join('');
     return `<article class="hcard${histSel&&histSel.includes(r.id)?' sel':''}" data-id="${r.id}"><span class="hc-check" aria-hidden="true">✓</span>
-      <button class="hc-main" data-act="open"><img alt="" src="${u}"><div class="hc-body"><div class="hc-date">${f.main}<small>${f.wd}</small></div>
+      <button class="hc-main" data-act="open">${u?`<img alt="" src="${u}">`:'<span class="hc-ph" aria-hidden="true"></span>'}<div class="hc-body"><div class="hc-date">${f.main}<small>${f.wd}</small></div>
       <div class="hc-meta">${(sm.hand||r.cfg.hand)==='L'?'左打ち':'右打ち'}・${(sm.view||r.cfg.view)==='dtl'?'後方':'正面'}</div><div class="hc-stats">${st}</div>${r.memo?`<div class="hc-memo"></div>`:''}</div></button>
       <button class="hc-more" data-act="edit" aria-label="日付・メモを編集">⋯</button></article>`}).join('');
   list.forEach(r=>{if(r.memo){const m=$('histList').querySelector(`[data-id="${r.id}"] .hc-memo`);if(m)m.textContent=r.memo}});
