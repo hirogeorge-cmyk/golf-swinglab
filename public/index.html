@@ -50,6 +50,7 @@ select,input[type=number]{font:inherit;font-size:13px;color:var(--ink);backgroun
 input[type=number]{width:76px}
 .btn{font:inherit;font-weight:700;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:36px}
 .btn:hover{border-color:var(--accent)}
+a.btn{text-decoration:none}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn.primary:hover{filter:brightness(1.08)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -148,6 +149,35 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .view>.transport,.view>.phases{margin-bottom:10px}
 .cmp-head .settings{margin-top:14px}
 .cmp-table{margin-top:18px}
+.hist-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:16px}
+.hist-head h2{margin:0}
+.hist-usage{font-size:12px;color:var(--muted)}
+.hist-actions{margin-bottom:12px}
+.hist-list{display:flex;flex-direction:column;gap:8px}
+.hcard{position:relative;display:flex;align-items:stretch;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.hcard.sel{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+.hc-main{all:unset;box-sizing:border-box;flex:1;display:flex;gap:12px;align-items:center;padding:8px;cursor:pointer;min-width:0}
+.hc-main:focus-visible{outline:2px solid var(--accent)}
+.hc-main img{width:66px;height:88px;object-fit:cover;border-radius:8px;background:var(--stage);flex:none}
+.hc-body{min-width:0;display:flex;flex-direction:column;gap:3px}
+.hc-date{font-family:var(--f-display);font-weight:700;font-size:20px;line-height:1.1}
+.hc-date small{font-family:var(--f-body);font-size:12px;font-weight:500;color:var(--muted);margin-left:4px}
+.hc-meta{font-size:12px;color:var(--muted)}
+.hc-stats{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12.5px;color:var(--muted)}
+.hc-stats b{font-family:var(--f-display);font-size:16px;color:var(--ink);font-weight:700}
+.hc-memo{font-size:12.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hc-more{all:unset;box-sizing:border-box;width:48px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:20px;cursor:pointer;border-left:1px solid var(--line)}
+.hc-check{display:none;position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;align-items:center;justify-content:center;font-size:13px}
+.hcard.sel .hc-check{display:flex}
+.selecting .hc-more{display:none}
+.cmpbar{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom,0px));margin-top:12px;background:var(--ink);color:var(--bg);border-radius:14px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;z-index:20}
+.cmpbar-btns{display:flex;gap:8px}
+.cmpbar .btn{background:transparent;color:var(--bg);border-color:rgba(255,255,255,.35)}
+.cmpbar .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.cmpbar .btn:disabled{opacity:.45}
+@media (max-width:760px){.cmpbar{bottom:calc(78px + env(safe-area-inset-bottom,0px))}}
+.btn.danger{color:var(--bad);border-color:var(--bad);justify-content:center}
+.sheet textarea,.sheet input[type=date]{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%;min-height:44px}
 .gridbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:12px}
 .seg-sm button{font-size:13px;min-height:38px;padding:0 10px}
 .gd-opt{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink);cursor:pointer}
@@ -240,7 +270,7 @@ body.noscroll{overflow:hidden}
   #setSummary{display:none}
   .chip{min-height:44px;min-width:44px;justify-content:center;padding:6px 10px}
   .head-pick{min-height:44px;padding:8px 12px;font-size:14px}
-  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;background:var(--surface);border-top:1px solid var(--line);border-bottom:0;overflow:visible;
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;margin:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;background:var(--surface);border-top:1px solid var(--line);border-bottom:0;overflow:visible;
     padding:4px max(6px,env(safe-area-inset-right,0px)) calc(4px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px))}
   .tabs a{flex-direction:column;justify-content:center;gap:3px;font-size:11px;padding:6px 2px;border-bottom:0;margin:0;min-height:56px;border-radius:10px;text-align:center}
   .tabs svg{width:24px;height:24px}
@@ -329,7 +359,8 @@ body.noscroll{overflow:hidden}
 <nav class="tabs" aria-label="表示の切り替え">
   <a href="#analyze" data-view="analyze"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v6m0 0l-4 6m4-6l4 6M7 10.5l5-1.5 5 1.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>解析</span></a>
   <a href="#check" data-view="check"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="14" y="4" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="13" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="14" y="13" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>コマ送り</span></a>
-  <a href="#compare" data-view="compare"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M17 4v16M3 9h8M13 15h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>お手本と比較</span></a>
+  <a href="#compare" data-view="compare"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M17 4v16M3 9h8M13 15h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>比較</span></a>
+  <a href="#history" data-view="history"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>履歴</span></a>
 </nav>
 
 <div id="view-analyze" class="view">
@@ -425,6 +456,22 @@ body.noscroll{overflow:hidden}
   <div class="fgrid" id="fgrid"></div>
   </div>
 </div>
+<div id="view-history" class="view" hidden>
+  <div class="hist-head"><h2>スイングの履歴</h2><span class="hist-usage" id="histUsage"></span></div>
+  <p class="intro">解析した動画は、日付と一緒にこの端末の中だけに保存されます（外部には送信されません）。2本を選ぶと、並べて比較できます。</p>
+  <div class="hist-actions"><button class="btn primary" id="histCmpBtn">2本を選んで比較する</button></div>
+  <div class="empty" id="histEmpty" hidden><p>まだ履歴がありません。「解析」タブで動画を選ぶと、ここに自動で保存されます。</p><a class="btn primary" href="#analyze">動画を選ぶ</a></div>
+  <div class="hist-list" id="histList"></div>
+  <div class="cmpbar" id="cmpBar" hidden><span id="cmpCount">比べる2本をタップして選んでください（0/2）</span><div class="cmpbar-btns"><button class="btn" id="cmpCancel">やめる</button><button class="btn primary" id="cmpGo" disabled>この2本を比べる</button></div></div>
+</div>
+<section class="sheet" id="hSheet" role="dialog" aria-modal="true" aria-labelledby="hTitle" hidden>
+  <div class="sheet-head"><h2 id="hTitle">履歴の編集</h2><button class="btn primary sheet-done" id="hSave">保存</button></div>
+  <div class="sheet-body">
+    <div class="sfield"><label class="slabel" for="hDate">撮影日</label><input id="hDate" type="date"></div>
+    <div class="sfield"><label class="slabel" for="hMemo">メモ</label><textarea id="hMemo" rows="3" maxlength="200" placeholder="例：ドライバー、練習場、トップで間をとる意識"></textarea></div>
+    <button class="btn danger" id="hDel">この履歴を削除</button>
+  </div>
+</section>
 <div class="lightbox" id="lb" role="dialog" aria-modal="true" aria-label="コマの拡大表示" hidden>
   <div class="lb-inner">
     <div class="lb-head"><span id="lbCap"></span><button class="btn icon-btn lb-close" id="lbClose" aria-label="閉じる">✕</button></div>
@@ -439,6 +486,7 @@ body.noscroll{overflow:hidden}
   <div class="cmp-head">
     <div class="cmp-actions">
       <label class="btn primary" for="mFile">お手本動画を選ぶ</label>
+      <a class="btn" href="#history" id="cmFromHist">履歴から2本を選ぶ</a>
       <input id="mFile" type="file" accept="video/*" hidden>
       <button class="chip" id="mSetBtn" aria-haspopup="dialog"><span id="mSummary">お手本の設定</span></button>
     </div>
@@ -446,12 +494,12 @@ body.noscroll{overflow:hidden}
   </div>
   <div class="toggles fitbar"><label><input type="checkbox" id="cmFit" checked>人物の大きさ・位置をそろえ、アドレス直前から再生する</label><label><input type="checkbox" id="cmSyncAll">トップ・インパクト・フィニッシュもそろえる</label><label><input type="checkbox" id="cmSkelA">お手本に骨格</label><label><input type="checkbox" id="cmSkelB" checked>自分に骨格</label><label><input type="checkbox" id="cmMirror">お手本を左右反転</label></div>
   <div class="duo">
-    <figure class="pane"><figcaption><span>お手本</span></figcaption>
+    <figure class="pane"><figcaption><span id="cmLabA">お手本</span></figcaption>
       <div class="stage2"><canvas id="cmA"></canvas><label class="m-empty" id="mEmpty" for="mFile"><span class="drop-title">お手本動画を選ぶ</span><span class="drop-sub">上手な人のスイング動画</span></label><div class="busy" id="busyM" hidden><div id="busyMText">準備中…</div><div class="bar"><i id="busyMBar"></i></div></div></div></figure>
-    <figure class="pane"><figcaption><span>自分</span></figcaption>
+    <figure class="pane"><figcaption><span id="cmLabB">自分</span></figcaption>
       <div class="stage2"><canvas id="cmB"></canvas></div></figure>
   </div>
-  <div class="strips"><div class="strip-label">お手本</div><div class="strip" id="cmStripM"><canvas></canvas></div><div class="strip-label">自分</div><div class="strip" id="cmStrip" role="slider" tabindex="0" aria-label="フレーム位置（なぞって移動）"><canvas></canvas></div></div>
+  <div class="strips"><div class="strip-label" id="stLabA">お手本</div><div class="strip" id="cmStripM"><canvas></canvas></div><div class="strip-label" id="stLabB">自分</div><div class="strip" id="cmStrip" role="slider" tabindex="0" aria-label="フレーム位置（なぞって移動）"><canvas></canvas></div></div>
 <div class="transport">
     <button class="btn icon-btn" id="cmPrev" aria-label="1コマ戻る">◀︎</button>
     <button class="btn play" id="cmPlay">再生</button>
@@ -905,7 +953,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&openSheetEl){closeShe
   if(curView!=='analyze'){const P=cm;if(e.key===' '){e.preventDefault();P.playing?P.stop():P.play()}if(e.key==='ArrowLeft'){P.stop();P.go(P.i-1)}if(e.key==='ArrowRight'){P.stop();P.go(P.i+1)}return}
   if(e.key===' '){e.preventDefault();S.playing?stop():play()}if(e.key==='ArrowLeft'){stop();seek(S.i-1)}if(e.key==='ArrowRight'){stop();seek(S.i+1)}});
 ['tSkel','tPath','tHead','tSpine'].forEach(id=>$(id).onchange=renderFrame);
-['hand','view','height','slow'].forEach(id=>$(id).onchange=()=>{if(!S.A)return;analyze();renderPanel();renderFrame();onMainChanged()});
+['hand','view','height','slow'].forEach(id=>$(id).onchange=()=>{if(!S.A)return;analyze();renderPanel();renderFrame();onMainChanged();if(S.histId)hPatch(S.histId,{cfg:{...S.cfg},summary:summaryOf(S)}).catch(()=>{})});
 window.addEventListener('resize',()=>{if(!S.A)return;layoutStage();renderFrame()});
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>drawCharts());
 new MutationObserver(()=>drawCharts()).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
@@ -1035,11 +1083,12 @@ async function analyzeFile(file){
     const r=await detectVideo(file,video,(t,p)=>busy(t,p),()=>my===runId);
     if(!r)return;
     S.thumbs=r.thumbs;S.rtm=r.rtm;S.W=r.W;S.H=r.H;S.source='video';S.video=video;S.name=file.name;layoutStage();
-    S.edits={};S.orig={};S.lockP=null;if(editMode)setEdit(false);
+    S.edits={};S.orig={};S.lockP=null;S.histId=null;S.label='';if(editMode)setEdit(false);
     S.frames=prepare(r.frames,S);S.i=0;analyze();const vmsg=S.A.valid?autoView(S,'view',mainCfg):'';
     if(!S.A.valid)throw new Error('スイングの区間を特定できませんでした。アドレスからフィニッシュまで映っているか確認してください。');
     setMainUI('done');layoutStage();renderPanel();seek(S.A.P[1]);busy(null);onMainChanged();
     $('notice').querySelector('strong').textContent='解析完了';
+    saveHistory(S,file).then(rec=>{if(rec&&my===runId){$('noticeText').textContent+=` ${fmtDate(rec.date).main} の履歴に保存しました。`;setCmpLabels()}});
     $('noticeText').textContent=`${file.name}（${r.dur.toFixed(1)} 秒${r.full>15?'・先頭15秒のみ':''}）を解析しました。${vmsg}数値は2D映像からの推定値です。撮影方向と利き手が正しいか確認してください。`;
   }catch(e){
     console.error(e);busy(`<span class="err">${e.message||'解析に失敗しました。'}</span><br><button class="btn" id="closeErr" style="margin-top:8px">閉じる</button>`,0);
@@ -1180,20 +1229,20 @@ function renderCmp(){
   if(!S.A)return;
   if(!M.A){$('cmWarn').textContent='';$('cmTbl').innerHTML='<tbody><tr><td style="color:var(--muted);white-space:normal">お手本動画を選ぶと、ここに数値の比較が表示されます。</td></tr></tbody>';return}
   const same=M.A.view===S.A.view, mode=same?S.A.view:null;
-  $('cmWarn').textContent=same?'自分 − お手本':'撮影方向が違うため、共通の項目だけを比べています';
+  $('cmWarn').textContent=same?`差＝${S.label||'自分'} − ${M.label||'お手本'}`:'撮影方向が違うため、共通の項目だけを比べています';
   const a=keyRows(M.A,mode),b=keyRows(S.A,mode);
   const fmt=(v,d)=>Number.isFinite(v)?v.toFixed(d):'–';
-  $('cmTbl').innerHTML='<thead><tr><th>項目</th><th>お手本</th><th>自分</th><th>差</th></tr></thead><tbody>'+a.map((r,k)=>{const v=b[k][1]-r[1];
+  $('cmTbl').innerHTML=`<thead><tr><th>項目</th><th>${M.label||'お手本'}</th><th>${S.label||'自分'}</th><th>差</th></tr></thead><tbody>`+a.map((r,k)=>{const v=b[k][1]-r[1];
     return `<tr><td>${r[0]}</td><td class="num">${fmt(r[1],r[3])}<small style="font-size:12px;color:var(--muted)">${r[2]}</small></td><td class="num">${fmt(b[k][1],r[3])}<small style="font-size:12px;color:var(--muted)">${r[2]}</small></td><td class="diff"><b>${v>0?'+':v<0?'−':'±'}${fmt(Math.abs(v),r[3])}</b>${r[2]}</td></tr>`}).join('')+'</tbody>';
 }
 let mRun=0;
 $('mFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!isVideoFile(file))return;const my=++mRun;cm.stop();
   try{const r=await detectVideo(file,M.video,(t,p)=>busy(t,p,'busyM'),()=>my===mRun);if(!r)return;
-    M.thumbs=r.thumbs;M.rtm=r.rtm;M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());if(M.A.valid)autoView(M,'mView',mCfg);
+    M.label='';M.histId=null;M.thumbs=r.thumbs;M.rtm=r.rtm;M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());if(M.A.valid)autoView(M,'mView',mCfg);
     if(!M.A.valid)throw new Error('お手本動画のスイング区間を特定できませんでした。アドレスからフィニッシュまで映っている動画を選んでください。');
     busy(null,0,'busyM');
     $('cmNote').innerHTML=`お手本：<b>${M.name.replace(/[<>&]/g,'')}</b>　自分：<b id="cmName"></b>　人物の大きさと立ち位置をそろえ、始動の瞬間をそろえて実際の速さで再生します。`;
-    $('cmName').textContent=S.name||'';renderCmp();if(S.A)cm.go(cm.i);
+    $('cmName').textContent=S.name||'';setCmpLabels();renderCmp();if(S.A)cm.go(cm.i);
   }catch(err){console.error(err);busy(`<span class="err">${err.message||'解析に失敗しました。'}</span><br><button class="btn" id="closeErrM" style="margin-top:8px">閉じる</button>`,0,'busyM');
     $('closeErrM').onclick=()=>{busy(null,0,'busyM');if(!M.A?.valid){M.A=null;renderCmp();cm.go(cm.i)}}}
 };
@@ -1224,7 +1273,7 @@ async function composeFrame(i,out){
   const put=(c,ox)=>{const k=Math.min(PANE_W/c.width,PANE_H/c.height),w=c.width*k,h=c.height*k;x.drawImage(c,ox+(PANE_W-w)/2,TOP+(PANE_H-h)/2,w,h)};
   if(M.A)put(tmpA,7);put(tmpB,OUT_W/2+3);
   x.fillStyle='#E9F0EA';x.font='700 28px "Noto Sans JP", sans-serif';x.textBaseline='middle';x.textAlign='left';
-  x.fillText('お手本',16,TOP/2);x.fillText('自分',OUT_W/2+12,TOP/2);
+  x.fillText(M.label||'お手本',16,TOP/2);x.fillText(S.label||'自分',OUT_W/2+12,TOP/2);
   x.textAlign='right';x.fillStyle='rgba(233,240,234,.55)';x.font='600 22px "Barlow Condensed", sans-serif';x.fillText('SWINGLAB',OUT_W-16,TOP/2);
   const sec=(S.frames[i].t-S.frames[S.A.P[1]].t)/S.cfg.slow;
   let ph='';for(const [k,l] of [[1,'アドレス'],[4,'トップ'],[7,'インパクト'],[10,'フィニッシュ']]) if(i>=S.A.P[k])ph=`P${k} ${l}`;
@@ -1277,7 +1326,96 @@ $('cmSaveVid').onclick=async()=>{
   finally{exporting=false;['cmSaveVid','cmSaveImg'].forEach(id=>$(id).disabled=false);cm.go(cm.i)}
 };
 
+/* ---------- history (IndexedDB: stays on this device) ---------- */
+let idbP=null;
+function idb(){if(idbP)return idbP;idbP=new Promise((res,rej)=>{let r;try{r=indexedDB.open('swinglab',1)}catch(e){return rej(e)}
+  r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('swings'))d.createObjectStore('swings',{keyPath:'id'});if(!d.objectStoreNames.contains('videos'))d.createObjectStore('videos',{keyPath:'id'})};
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);r.onblocked=()=>rej(new Error('blocked'))});idbP.catch(()=>{idbP=null});return idbP}
+async function idbDo(stores,mode,fn){const d=await idb();return new Promise((res,rej)=>{const t=d.transaction(stores,mode);let out;fn(t,v=>{out=v});t.oncomplete=()=>res(out);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error||new Error('abort'))})}
+const hAll=()=>idbDo(['swings'],'readonly',(t,set)=>{const r=t.objectStore('swings').getAll();r.onsuccess=()=>set(r.result)});
+const hGet=id=>idbDo(['swings'],'readonly',(t,set)=>{const r=t.objectStore('swings').get(id);r.onsuccess=()=>set(r.result)});
+const hVideo=id=>idbDo(['videos'],'readonly',(t,set)=>{const r=t.objectStore('videos').get(id);r.onsuccess=()=>set(r.result)});
+const hPut=(rec,blob)=>idbDo(['swings','videos'],'readwrite',t=>{t.objectStore('swings').put(rec);if(blob)t.objectStore('videos').put({id:rec.id,blob})});
+const hDelete=id=>idbDo(['swings','videos'],'readwrite',t=>{t.objectStore('swings').delete(id);t.objectStore('videos').delete(id)});
+async function hPatch(id,patch){const r=await hGet(id);if(!r)return;Object.assign(r,patch);await idbDo(['swings'],'readwrite',t=>t.objectStore('swings').put(r))}
+const ymd=d=>{const z=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`};
+const fmtDate=s=>{const [y,m,d]=s.split('-').map(Number);const w='日月火水木金土'[new Date(y,m-1,d).getDay()];return {main:`${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}`,wd:`（${w}）`}};
+const canvasBlob=(c,q=0.72)=>new Promise(r=>c.toBlob(r,'image/jpeg',q));
+async function blobToCanvas(b){const bm=await createImageBitmap(b);const c=document.createElement('canvas');c.width=bm.width;c.height=bm.height;c.getContext('2d').drawImage(bm,0,0);bm.close&&bm.close();return c}
+function summaryOf(sw){const A=sw.A,P=A.P;return {tempo:A.tempo,back:A.back,down:A.down,sh:A.shA?A.shF[P[4]]:null,head:A.view==='face'?A.headSide[P[4]]:null,view:A.view,hand:sw.cfg.hand}}
+async function saveHistory(sw,file){
+  try{
+    try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+    let d=new Date(file.lastModified||Date.now());if(!(d.getTime()>0)||d.getTime()>Date.now()+864e5)d=new Date();
+    await seekVid(sw,sw.frames[sw.A.P[4]].t);const pc=document.createElement('canvas');drawSwing(pc,sw,sw.A.P[4],{video:true,fit:true});
+    const sm=document.createElement('canvas');sm.width=180;sm.height=240;sm.getContext('2d').drawImage(pc,0,0,180,240);
+    const rec={id:'sw_'+Date.now().toString(36),date:ymd(d),created:Date.now(),file:file.name||'',cfg:{...sw.cfg},W:sw.W,H:sw.H,rtm:!!sw.rtm,hw:sw.hw,
+      frames:sw.frames.map(f=>({t:f.t,p:f.p,w:f.w})),thumbs:await Promise.all((sw.thumbs||[]).map(async th=>({t:th.t,blob:await canvasBlob(th.c,0.7)}))),
+      poster:await canvasBlob(sm,0.8),summary:summaryOf(sw),memo:''};
+    await hPut(rec,file);await seekVid(sw,sw.frames[sw.i||0].t);if(sw===S&&curView==='analyze')renderFrame();sw.histId=rec.id;sw.label=fmtDate(rec.date).main;return rec;
+  }catch(e){console.warn('history save failed',e);return null}
+}
+async function loadRecord(sw,rec,videoEl,ids,cfgFn){
+  const v=await hVideo(rec.id);if(!v||!v.blob)throw new Error('動画が見つかりませんでした。');
+  await loadVideoFile(videoEl,v.blob);
+  Object.entries(ids).forEach(([k,id])=>{$(id).value=String(rec.cfg[k])});
+  Object.assign(sw,{video:videoEl,source:'video',W:rec.W,H:rec.H,rtm:rec.rtm,hw:rec.hw,name:fmtDate(rec.date).main,label:fmtDate(rec.date).main,histId:rec.id,edits:{},orig:{},lockP:null,i:0,
+    frames:rec.frames.map(f=>({t:f.t,p:f.p.map(q=>[...q]),w:f.w}))});
+  sw.thumbs=await Promise.all((rec.thumbs||[]).map(async th=>({t:th.t,c:await blobToCanvas(th.blob)})));
+  analyze(sw,cfgFn());
+}
+const MAIN_IDS={hand:'hand',view:'view',height:'height',slow:'slow'},M_IDS={hand:'mHand',view:'mView',height:'mHeight',slow:'mSlow'};
+async function openRecordMain(rec){
+  runId++;stop();if(editMode)setEdit(false);
+  await loadRecord(S,rec,video,MAIN_IDS,mainCfg);try{syncSeg();updSummary()}catch(e){}
+  setMainUI('done');layoutStage();renderPanel();seek(S.A.P[1]);onMainChanged();
+  $('notice').querySelector('strong').textContent='履歴';$('noticeText').textContent=`${fmtDate(rec.date).main} のスイングを開きました。${rec.memo?'メモ：'+rec.memo:''}`;
+}
+let histSel=null,posterUrls=[];
+async function renderHistory(){
+  let list=null;try{list=await hAll()}catch(e){}
+  posterUrls.forEach(u=>URL.revokeObjectURL(u));posterUrls=[];
+  if(list==null){$('histList').innerHTML='<p class="intro">この画面では履歴を保存できません（ブラウザの設定で保存が無効になっている可能性があります）。</p>';$('histEmpty').hidden=true;return}
+  list.sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.created);
+  $('histEmpty').hidden=list.length>0;$('histCmpBtn').hidden=list.length<2;
+  $('histList').classList.toggle('selecting',!!histSel);
+  $('histList').innerHTML=list.map(r=>{const u=r.poster?URL.createObjectURL(r.poster):'';u&&posterUrls.push(u);const f=fmtDate(r.date),sm=r.summary||{};
+    const st=[sm.tempo?`<span>テンポ <b>${f1(sm.tempo)}</b>:1</span>`:'',sm.sh!=null?`<span>肩 <b>${f0(sm.sh)}</b>°</span>`:'',sm.head!=null?`<span>頭 <b>${f1(sm.head)}</b>cm</span>`:''].join('');
+    return `<article class="hcard${histSel&&histSel.includes(r.id)?' sel':''}" data-id="${r.id}"><span class="hc-check" aria-hidden="true">✓</span>
+      <button class="hc-main" data-act="open"><img alt="" src="${u}"><div class="hc-body"><div class="hc-date">${f.main}<small>${f.wd}</small></div>
+      <div class="hc-meta">${(sm.hand||r.cfg.hand)==='L'?'左打ち':'右打ち'}・${(sm.view||r.cfg.view)==='dtl'?'後方':'正面'}</div><div class="hc-stats">${st}</div>${r.memo?`<div class="hc-memo"></div>`:''}</div></button>
+      <button class="hc-more" data-act="edit" aria-label="日付・メモを編集">⋯</button></article>`}).join('');
+  list.forEach(r=>{if(r.memo){const m=$('histList').querySelector(`[data-id="${r.id}"] .hc-memo`);if(m)m.textContent=r.memo}});
+  $('histList').querySelectorAll('.hcard').forEach(card=>{const id=card.dataset.id,rec=list.find(r=>r.id===id);
+    card.querySelector('.hc-main').onclick=async()=>{
+      if(histSel){const k=histSel.indexOf(id);if(k>=0)histSel.splice(k,1);else if(histSel.length<2)histSel.push(id);updCmpBar();card.classList.toggle('sel',histSel.includes(id));return}
+      try{await openRecordMain(rec);location.hash='#analyze'}catch(e){alertMsg(e.message)}};
+    card.querySelector('.hc-more').onclick=()=>openHEdit(rec)});
+  try{const e=await navigator.storage.estimate();$('histUsage').textContent=`${list.length}件・約${Math.round((e.usage||0)/1e6)}MB使用`}catch(e){$('histUsage').textContent=`${list.length}件`}
+}
+const alertMsg=t=>{$('cmpCount').textContent=t};
+function updCmpBar(){$('cmpBar').hidden=!histSel;if(!histSel)return;$('cmpCount').textContent=`比べる2本をタップして選んでください（${histSel.length}/2）`;$('cmpGo').disabled=histSel.length!==2}
+$('histCmpBtn').onclick=()=>{histSel=[];updCmpBar();renderHistory()};
+$('cmFromHist').onclick=()=>{histSel=[];setTimeout(()=>{updCmpBar();renderHistory()},0)};
+$('cmpCancel').onclick=()=>{histSel=null;updCmpBar();renderHistory()};
+$('cmpGo').onclick=async()=>{if(!histSel||histSel.length!==2)return;$('cmpGo').disabled=true;$('cmpCount').textContent='読み込み中…';
+  try{const recs=await Promise.all(histSel.map(hGet));recs.sort((a,b)=>a.date.localeCompare(b.date)||a.created-b.created);
+    await openRecordMain(recs[1]);
+    await loadRecord(M,recs[0],M.video,M_IDS,mCfg);try{syncSeg();updSummary()}catch(e){}
+    histSel=null;updCmpBar();setCmpLabels();renderCmp();
+    $('cmNote').textContent=`${M.label} と ${S.label} のスイングを、大きさと立ち位置をそろえ、始動の瞬間をそろえて実際の速さで再生します。`;
+    location.hash='#compare';
+  }catch(e){console.error(e);$('cmpCount').textContent='読み込めませんでした：'+(e.message||'');$('cmpGo').disabled=false}};
+let hEditing=null;
+function openHEdit(rec){hEditing=rec;$('hDate').value=rec.date;$('hMemo').value=rec.memo||'';$('hDel').textContent='この履歴を削除';$('hDel').dataset.armed='';openSheet('hSheet')}
+$('hSave').onclick=async()=>{if(!hEditing)return;const d=$('hDate').value||hEditing.date;await hPatch(hEditing.id,{date:d,memo:$('hMemo').value.trim().slice(0,200)});
+  if(S.histId===hEditing.id){S.label=fmtDate(d).main}if(M.histId===hEditing.id){M.label=fmtDate(d).main}setCmpLabels();hEditing=null;closeSheet();renderHistory()};
+$('hDel').onclick=async()=>{if(!hEditing)return;const b=$('hDel');if(!b.dataset.armed){b.dataset.armed='1';b.textContent='もう一度押すと削除します';return}
+  await hDelete(hEditing.id);hEditing=null;closeSheet();renderHistory()};
+function setCmpLabels(){const a=M.label||'お手本',b=S.label||'自分';['cmLabA','stLabA'].forEach(id=>$(id).textContent=a);['cmLabB','stLabB'].forEach(id=>$(id).textContent=b)}
+
 function onMainChanged(){
+  setCmpLabels();
   const has=!!S.A;['ck','cm'].forEach(p=>{$(p+'Empty').hidden=has;$(p+'Body').hidden=!has});
   if(!has)return;
   ['ckName','cmName'].forEach(id=>{const e=$(id);if(e)e.textContent=S.name||''});
@@ -1286,13 +1424,14 @@ function onMainChanged(){
 }
 
 /* ---------- views ---------- */
-const VIEWS=['analyze','check','compare'];let curView='analyze';
+const VIEWS=['analyze','check','compare','history'];let curView='analyze';
 function showView(v){
   if(!VIEWS.includes(v))v='analyze';
   if(curView==='check')S.i=ck.i;if(curView==='compare')S.i=cm.i;
   stop();ck.stop();cm.stop();curView=v;
   VIEWS.forEach(x=>$('view-'+x).hidden=x!==v);
   document.querySelectorAll('.tabs a').forEach(a=>a.dataset.view===v?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current'));
+  if(v==='history'){if(!$('cmpBar').hidden&&!histSel)updCmpBar();renderHistory();return}
   if(!S.A)return;
   if(v==='analyze'){layoutStage();seek(S.i)}else if(v==='check')ck.go(S.i);else cm.go(S.i);
 }
@@ -1316,7 +1455,7 @@ document.querySelectorAll('.seg').forEach(g=>g.addEventListener('click',e=>{cons
   if(sel.value!==b.dataset.v){sel.value=b.dataset.v;sel.dispatchEvent(new Event('change'))}syncSeg();updSummary()}));
 document.querySelectorAll('[data-step]').forEach(b=>b.addEventListener('click',()=>{const i=$(b.dataset.for);i.value=clamp((+i.value||170)+(+b.dataset.step),120,210);i.dispatchEvent(new Event('change'));updSummary()}));
 ['height','mHeight'].forEach(id=>$(id).addEventListener('input',updSummary));
-function openSheet(id){openSheetEl=$(id);openSheetEl.hidden=false;$('sheetBg').hidden=false;document.body.classList.add('noscroll');openSheetEl.querySelector('[data-close]').focus()}
+function openSheet(id){openSheetEl=$(id);openSheetEl.hidden=false;$('sheetBg').hidden=false;document.body.classList.add('noscroll');(openSheetEl.querySelector('[data-close]')||openSheetEl.querySelector('button'))?.focus()}
 function closeSheet(){if(!openSheetEl)return;const el=openSheetEl;el.hidden=true;$('sheetBg').hidden=true;document.body.classList.remove('noscroll');openSheetEl=null;
   (el.id==='mSheet'?$('mSetBtn'):$('setBtn')).focus({preventScroll:true})}
 $('setBtn').onclick=()=>openSheet('setSheet');$('setCard').onclick=()=>openSheet('setSheet');$('mSetBtn').onclick=()=>openSheet('mSheet');
