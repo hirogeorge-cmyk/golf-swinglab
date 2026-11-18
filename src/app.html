@@ -518,6 +518,16 @@ function prepare(frames,sw=S){
 }
 
 /* ---------- analysis ---------- */
+// Face-on: at address the shoulders show their full width; down-the-line they overlap.
+function detectView(sw){
+  // use the frames where the hands are lowest (address / impact), where the shoulders face the ball
+  const F=sw.frames,hy=F.map(f=>(f.p[15][1]+f.p[16][1])/2),ord=hy.map((v,i)=>i).sort((x,y)=>hy[y]-hy[x]).slice(0,Math.max(5,Math.round(F.length*0.15)));
+  const r=ord.map(i=>{const q=F[i].p,sm=mid(q[11],q[12]),hm=mid(q[23],q[24]);
+    const L=dist(q[0],sm)+dist(sm,hm)+(dist(q[23],q[25])+dist(q[24],q[26]))/2+(dist(q[25],q[27])+dist(q[26],q[28]))/2;return Math.abs(q[11][0]-q[12][0])/(L||1)});
+  r.sort((a,b)=>a-b);const v=r[r.length>>1];return v>0.18?'face':v<0.13?'dtl':null}
+function autoView(sw,selId,cfgFn){const d=detectView(sw);if(!d||d===$(selId).value)return '';
+  $(selId).value=d;analyze(sw,cfgFn());try{syncSeg();updSummary()}catch(e){}
+  return `撮影方向を「${d==='face'?'正面':'後方'}」と判断して切り替えました（設定から変更できます）。`}
 function mainCfg(){return {hand:$('hand').value,view:$('view').value,slow:+$('slow').value,height:+$('height').value}}
 function analyze(sw=S,cfg=mainCfg()){
   sw.cfg=cfg;
@@ -570,9 +580,12 @@ function analyze(sw=S,cfg=mainCfg()){
   const shT=turn3d(lead.s,trail.s), hpT=turn3d(lead.h,trail.h);
   // Down-the-line: at the top the back faces the camera and both shoulders are visible, so the apparent
   // shoulder width (vs. the body's real width from the height setting) gives the turn: sin(turn) = width / full width.
-  const dtlTurn=(a,b,frac)=>{if(view!=='dtl')return null;const Wf=heightCm*frac;
-    const ang=F.map(f=>deg(Math.asin(clamp(Math.abs(f.p[a][0]-f.p[b][0])*cm/Wf,0,1))));const b0=ang[adr];return smooth(ang.map(v=>Math.max(0,v-b0)))};
-  const shD=dtlTurn(11,12,0.21), hpD=dtlTurn(23,24,0.105);
+  // Down-the-line (reference only): the full shoulder width shows when the chest faces the camera (at a full turn,
+  // and again at the finish), so the widest apparent width in the swing stands for the real width.
+  const dtlTurn=(a,b)=>{if(view!=='dtl')return null;const ws=F.map(f=>Math.abs(f.p[a][0]-f.p[b][0]));
+    const win=ws.slice(adr,Math.min(n,fin+Math.round((fin-imp)||1)+1)).sort((x,y)=>x-y);const Wf=win[Math.floor(win.length*0.95)]||1;
+    return smooth(ws.map(w=>deg(Math.asin(clamp(w/Wf,0,1)))))};
+  const shD=dtlTurn(11,12), hpD=dtlTurn(23,24);
   const spine=F.map(f=>{const h=mid(f.p[23],f.p[24]),s=mid(f.p[11],f.p[12]);const a=deg(Math.atan2(s[0]-h[0],-(s[1]-h[1])));return view==='face'?-tdir*a:tdir*a;});
   const leadElbow=F.map(f=>angleAt(f.p[lead.s],f.p[lead.e],f.p[lead.w]));
   const trailKnee=F.map(f=>angleAt(f.p[trail.h],f.p[trail.k],f.p[trail.a]));
@@ -630,7 +643,7 @@ function renderPanel(){
   else if(face){const mm=arr=>[P[1],P[4],P[7]].map(i=>arr[i]==null?'–':f0(arr[i]));
     rows.push(['肩の回転（マーカー修正）','°',mm(A.shM),'トップで両肩を修正すると計算']);
     rows.push(['腰の回転（マーカー修正）','°',mm(A.hpM),'トップで腰を修正すると計算']);}
-  if(!face){rows.push(['肩の回転（後方撮影から推定）','°',at(A.shD),'トップ 80〜90°・最大90°まで']);rows.push(['腰の回転（後方撮影から推定）','°',at(A.hpD),'トップ 35〜50°']);}
+  if(!face){rows.push(['肩の回転（参考値）','°',at(A.shD),'後方撮影では±20°ほどずれます。正確には正面撮影で']);}
   else if(!A.shA){rows.push(['肩の回転（参考値）','°',at(A.shT),'正面撮影では実際より小さく出ます']);
   rows.push(['腰の回転（参考値）','°',at(A.hpT),'正面撮影では実際より小さく出ます']);}
   if(face){
@@ -649,7 +662,7 @@ function renderPanel(){
     rows.map(r=>`<tr><td>${r[0]}<span class="ref">${r[3]}</span></td>${r[2].map(v=>`<td class="num">${v}<small style="font-size:12px;color:var(--muted)"> ${r[1]}</small></td>`).join('')}</tr>`).join('')+'</tbody>';
 
   const D=[];
-  if(!face&&A.shD){const sh=A.shD[P[4]],xf=sh-A.hpD[P[4]];
+  if(false){const sh=A.shD[P[4]],xf=sh-A.hpD[P[4]];
     D.push({s:sh>=80?'good':sh>=65?'warn':'bad',t:`トップの肩の回転 ${f0(sh)}°（後方撮影から推定）`,d:sh>=80?'十分な肩の回転ができています。':'肩の回転が浅めです。左肩をあごの下まで入れ、背中が目標を向くまで回しましょう。',i:P[4]});
     D.push({s:xf>=30?'good':xf>=20?'warn':'bad',t:`捻転差 ${f0(xf)}°（後方撮影から推定）`,d:xf>=30?'上半身と下半身の捻転差が作れています。':'腰が回りすぎている、または肩の回転が浅い状態です。',i:P[4]});}
   if(face&&A.shF&&A.shF[P[4]]!=null){const sh=A.shF[P[4]],how=A.shM[P[4]]!=null?'マーカー修正':'自動';
@@ -689,7 +702,7 @@ function niceTicks(min,max,n=4){const span=(max-min)||1,s0=span/n,mag=10**Math.f
 function buildCharts(){
   const A=S.A, face=A.view==='face';
   const defs=[
-    {title:A.shA||A.view==='dtl'?'肩と腰の回転':'肩と腰の回転（参考値・実際より小さく出ます）',unit:'°',series:[{label:'肩',v:A.shBest,c:'--accent'},{label:'腰',v:A.hpBest,c:'--accent-2',dash:true}]},
+    {title:A.shA?'肩と腰の回転':(A.view==='dtl'?'肩と腰の回転（参考値）':'肩と腰の回転（参考値・実際より小さく出ます）'),unit:'°',series:A.view==='dtl'&&!A.shA?[{label:'肩',v:A.shBest,c:'--accent'}]:[{label:'肩',v:A.shBest,c:'--accent'},{label:'腰',v:A.hpBest,c:'--accent-2',dash:true}]},
     face?{title:'頭の移動（左右）',unit:'cm',series:[{label:'頭',v:A.headSide,c:'--accent'}]}:{title:'前傾角',unit:'°',series:[{label:'前傾角',v:A.spine,c:'--accent'}]},
     {title:'手のスピード（低めに出ます）',unit:'m/s',series:[{label:'スピード',v:A.speed,c:'--accent'}]}
   ];
@@ -983,11 +996,11 @@ async function analyzeFile(file){
     if(!r)return;
     S.thumbs=r.thumbs;S.rtm=r.rtm;S.W=r.W;S.H=r.H;S.source='video';S.video=video;S.name=file.name;layoutStage();
     S.edits={};S.orig={};S.lockP=null;if(editMode)setEdit(false);
-    S.frames=prepare(r.frames,S);S.i=0;analyze();
+    S.frames=prepare(r.frames,S);S.i=0;analyze();const vmsg=S.A.valid?autoView(S,'view',mainCfg):'';
     if(!S.A.valid)throw new Error('スイングの区間を特定できませんでした。アドレスからフィニッシュまで映っているか確認してください。');
     setMainUI('done');layoutStage();renderPanel();seek(S.A.P[1]);busy(null);onMainChanged();
     $('notice').querySelector('strong').textContent='解析完了';
-    $('noticeText').textContent=`${file.name}（${r.dur.toFixed(1)} 秒${r.full>15?'・先頭15秒のみ':''}）を解析しました。数値は2D映像からの推定値です。撮影方向と利き手が正しいか確認してください。`;
+    $('noticeText').textContent=`${file.name}（${r.dur.toFixed(1)} 秒${r.full>15?'・先頭15秒のみ':''}）を解析しました。${vmsg}数値は2D映像からの推定値です。撮影方向と利き手が正しいか確認してください。`;
   }catch(e){
     console.error(e);busy(`<span class="err">${e.message||'解析に失敗しました。'}</span><br><button class="btn" id="closeErr" style="margin-top:8px">閉じる</button>`,0);
     $('closeErr').onclick=()=>{busy(null);resetMain()};
@@ -1083,7 +1096,7 @@ const cm=makePlayer('cm',async i=>{
   drawSwing($('cmB'),S,i,{video:true,fit,...lineOpts($('cmSkelB').checked)});});
 function keyRows(A,mode){const P=A.P;const r=[
   ['テンポ',A.tempo,' : 1',1],['バックスイング',A.back,' s',2],['ダウンスイング',A.down,' s',2],['トップの間',A.pause,' s',2],
-  [A.shA||A.view==='dtl'?'肩の回転（トップ）':'肩の回転（トップ・参考値）',A.shBest[P[4]],'°',0],[A.shA||A.view==='dtl'?'腰の回転（トップ）':'腰の回転（トップ・参考値）',A.hpBest[P[4]],'°',0],
+  [A.shA?'肩の回転（トップ）':'肩の回転（トップ・参考値）',A.shBest[P[4]],'°',0],[A.shA?'腰の回転（トップ）':'腰の回転（トップ・参考値）',A.hpBest[P[4]],'°',0],
   ['頭の沈み（トップ）',A.headDown[P[4]],' cm',1],['頭のずれ（インパクト）',A.head[P[7]],' cm',1]];
   if(mode==='face')r.push(['頭の横移動（トップ）',A.headSide[P[4]],' cm',1],['腰の移動（インパクト）',A.hipX[P[7]],' cm',1]);
   if(mode==='dtl')r.push(['前傾角の変化（P1→P7）',A.spine[P[7]]-A.spine[P[1]],'°',0],['腰のボール方向移動（P7）',A.hipX[P[7]],' cm',1]);
@@ -1101,7 +1114,7 @@ function renderCmp(){
 let mRun=0;
 $('mFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!isVideoFile(file))return;const my=++mRun;cm.stop();
   try{const r=await detectVideo(file,M.video,(t,p)=>busy(t,p,'busyM'),()=>my===mRun);if(!r)return;
-    M.thumbs=r.thumbs;M.rtm=r.rtm;M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());
+    M.thumbs=r.thumbs;M.rtm=r.rtm;M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());if(M.A.valid)autoView(M,'mView',mCfg);
     if(!M.A.valid)throw new Error('お手本動画のスイング区間を特定できませんでした。アドレスからフィニッシュまで映っている動画を選んでください。');
     busy(null,0,'busyM');
     $('cmNote').innerHTML=`お手本：<b>${M.name.replace(/[<>&]/g,'')}</b>　自分：<b id="cmName"></b>　人物の大きさと立ち位置をそろえ、始動の瞬間をそろえて実際の速さで再生します。`;
