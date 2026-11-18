@@ -165,6 +165,7 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .hcard.sel .hc-check{display:flex}
 .selecting .hc-more{display:none}
 .cmpbar{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom,0px));margin-top:12px;background:var(--ink);color:var(--bg);border-radius:14px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;z-index:20}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:60;max-width:min(92vw,520px);background:var(--surface-2);color:var(--ink);border:1px solid rgba(201,168,106,.4);border-radius:12px;padding:12px 16px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .cmpbar-btns{display:flex;gap:8px}
 .cmpbar .btn{background:transparent;color:var(--bg);border-color:rgba(255,255,255,.35)}
 .cmpbar .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -1371,12 +1372,13 @@ async function idbDo(stores,mode,fn){const d=await idb();return new Promise((res
 const hAll=()=>idbDo(['swings'],'readonly',(t,set)=>{const r=t.objectStore('swings').getAll();r.onsuccess=()=>set(r.result)});
 const hGet=id=>idbDo(['swings'],'readonly',(t,set)=>{const r=t.objectStore('swings').get(id);r.onsuccess=()=>set(r.result)});
 const hVideo=id=>idbDo(['videos'],'readonly',(t,set)=>{const r=t.objectStore('videos').get(id);r.onsuccess=()=>set(r.result)});
-const hPut=(rec,blob)=>idbDo(['swings','videos'],'readwrite',t=>{t.objectStore('swings').put(rec);if(blob)t.objectStore('videos').put({id:rec.id,blob})});
+const hPut=(rec,vid)=>idbDo(['swings','videos'],'readwrite',t=>{t.objectStore('swings').put(rec);if(vid)t.objectStore('videos').put({id:rec.id,...vid})});
 const hDelete=id=>idbDo(['swings','videos'],'readwrite',t=>{t.objectStore('swings').delete(id);t.objectStore('videos').delete(id)});
 async function hPatch(id,patch){const r=await hGet(id);if(!r)return;Object.assign(r,patch);await idbDo(['swings'],'readwrite',t=>t.objectStore('swings').put(r))}
 const ymd=d=>{const z=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`};
 const fmtDate=s=>{const [y,m,d]=s.split('-').map(Number);const w='日月火水木金土'[new Date(y,m-1,d).getDay()];return {main:`${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}`,wd:`（${w}）`}};
 const canvasBlob=(c,q=0.72)=>new Promise(r=>c.toBlob(r,'image/jpeg',q));
+async function urlToCanvas(u){const im=new Image();im.src=u;await im.decode();const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;c.getContext('2d').drawImage(im,0,0);return c}
 async function blobToCanvas(b){const bm=await createImageBitmap(b);const c=document.createElement('canvas');c.width=bm.width;c.height=bm.height;c.getContext('2d').drawImage(bm,0,0);bm.close&&bm.close();return c}
 function summaryOf(sw){const A=sw.A,P=A.P;return {tempo:A.tempo,back:A.back,down:A.down,sh:A.shA?A.shF[P[4]]:null,head:A.view==='face'?A.headSide[P[4]]:null,view:A.view,hand:sw.cfg.hand}}
 async function saveHistory(sw,file){
@@ -1386,18 +1388,20 @@ async function saveHistory(sw,file){
     await seekVid(sw,sw.frames[sw.A.P[4]].t);const pc=document.createElement('canvas');drawSwing(pc,sw,sw.A.P[4],{video:true,fit:true});
     const sm=document.createElement('canvas');sm.width=180;sm.height=240;sm.getContext('2d').drawImage(pc,0,0,180,240);
     const rec={id:'sw_'+Date.now().toString(36),date:ymd(d),created:Date.now(),file:file.name||'',cfg:{...sw.cfg},W:sw.W,H:sw.H,rtm:!!sw.rtm,hw:sw.hw,
-      frames:sw.frames.map(f=>({t:f.t,p:f.p,w:f.w})),thumbs:await Promise.all((sw.thumbs||[]).map(async th=>({t:th.t,blob:await canvasBlob(th.c,0.7)}))),
+      frames:sw.frames.map(f=>({t:f.t,p:f.p,w:f.w})),thumbs:(sw.thumbs||[]).map(th=>({t:th.t,url:th.c.toDataURL('image/jpeg',0.7)})),
       posterUrl:sm.toDataURL('image/jpeg',0.8),summary:summaryOf(sw),memo:''};
-    await hPut(rec,file);await seekVid(sw,sw.frames[sw.i||0].t);if(sw===S&&curView==='analyze')renderFrame();sw.histId=rec.id;sw.label=fmtDate(rec.date).main;return rec;
+    const buf=await file.arrayBuffer();if(!buf.byteLength)throw new Error('empty video');
+    await hPut(rec,{buf,type:file.type||'video/mp4'});await seekVid(sw,sw.frames[sw.i||0].t);if(sw===S&&curView==='analyze')renderFrame();sw.histId=rec.id;sw.label=fmtDate(rec.date).main;return rec;
   }catch(e){console.warn('history save failed',e);return null}
 }
 async function loadRecord(sw,rec,videoEl,ids,cfgFn){
-  const v=await hVideo(rec.id);if(!v||!v.blob)throw new Error('動画が見つかりませんでした。');
-  await loadVideoFile(videoEl,v.blob);
+  const v=await hVideo(rec.id);const vb=v&&(v.buf?new Blob([v.buf],{type:v.type||'video/mp4'}):v.blob);
+  if(!vb||!vb.size)throw new Error('この履歴の動画を読み込めませんでした。お手数ですが、動画をもう一度解析してください。');
+  await loadVideoFile(videoEl,vb);
   Object.entries(ids).forEach(([k,id])=>{$(id).value=String(rec.cfg[k])});
   Object.assign(sw,{video:videoEl,source:'video',W:rec.W,H:rec.H,rtm:rec.rtm,hw:rec.hw,name:fmtDate(rec.date).main,label:fmtDate(rec.date).main,histId:rec.id,edits:{},orig:{},lockP:null,i:0,
     frames:rec.frames.map(f=>({t:f.t,p:f.p.map(q=>[...q]),w:f.w}))});
-  sw.thumbs=await Promise.all((rec.thumbs||[]).map(async th=>({t:th.t,c:await blobToCanvas(th.blob)})));
+  sw.thumbs=(await Promise.all((rec.thumbs||[]).map(async th=>{try{return {t:th.t,c:th.url?await urlToCanvas(th.url):await blobToCanvas(th.blob)}}catch(e){return null}}))).filter(Boolean);
   analyze(sw,cfgFn());
 }
 const MAIN_IDS={hand:'hand',view:'view',height:'height',slow:'slow'},M_IDS={hand:'mHand',view:'mView',height:'mHeight',slow:'mSlow'};
@@ -1411,8 +1415,8 @@ let histSel=null,posterUrls=[];
 const blobToDataURL=b=>new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>rej(fr.error);fr.readAsDataURL(b)});
 // older records kept the poster as a Blob; rebuild a data: URL from it (or from the stored frame thumbnails)
 async function makePosterUrl(r){
-  try{const src=r.poster||(r.thumbs&&r.thumbs.length?r.thumbs[Math.floor(r.thumbs.length*0.4)].blob:null);if(!src)return '';
-    const bm=await createImageBitmap(src);const c=document.createElement('canvas');c.width=180;c.height=240;const x=c.getContext('2d');
+  try{const th=r.thumbs&&r.thumbs.length?r.thumbs[Math.floor(r.thumbs.length*0.4)]:null;const src=r.poster||(th&&(th.url||th.blob));if(!src)return '';
+    const bm=typeof src==='string'?await urlToCanvas(src):await createImageBitmap(src);const c=document.createElement('canvas');c.width=180;c.height=240;const x=c.getContext('2d');
     const k=Math.max(180/bm.width,240/bm.height),w=bm.width*k,h=bm.height*k;x.fillStyle='#060907';x.fillRect(0,0,180,240);x.drawImage(bm,(180-w)/2,(240-h)/2,w,h);bm.close&&bm.close();
     return c.toDataURL('image/jpeg',0.8)}catch(e){console.warn('poster',e);return ''}}
 async function renderHistory(){
@@ -1433,11 +1437,12 @@ async function renderHistory(){
   $('histList').querySelectorAll('.hcard').forEach(card=>{const id=card.dataset.id,rec=list.find(r=>r.id===id);
     card.querySelector('.hc-main').onclick=async()=>{
       if(histSel){const k=histSel.indexOf(id);if(k>=0)histSel.splice(k,1);else if(histSel.length<2)histSel.push(id);updCmpBar();card.classList.toggle('sel',histSel.includes(id));return}
-      try{await openRecordMain(rec);location.hash='#analyze'}catch(e){alertMsg(e.message)}};
+      try{await openRecordMain(rec);location.hash='#analyze'}catch(e){console.error(e);toast(e.message||'開けませんでした。')}};
     card.querySelector('.hc-more').onclick=()=>openHEdit(rec)});
   try{const e=await navigator.storage.estimate();$('histUsage').textContent=`${list.length}件・約${Math.round((e.usage||0)/1e6)}MB使用`}catch(e){$('histUsage').textContent=`${list.length}件`}
 }
 const alertMsg=t=>{$('cmpCount').textContent=t};
+function toast(t){let el=$('toast');if(!el){el=document.createElement('div');el.id='toast';el.className='toast';el.setAttribute('role','status');document.body.appendChild(el)}el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>{el.hidden=true},5000)}
 function updCmpBar(){$('cmpBar').hidden=!histSel;if(!histSel)return;$('cmpCount').textContent=`比べる2本をタップして選んでください（${histSel.length}/2）`;$('cmpGo').disabled=histSel.length!==2}
 $('histCmpBtn').onclick=()=>{histSel=[];updCmpBar();renderHistory()};
 $('cmFromHist').onclick=()=>{histSel=[];setTimeout(()=>{updCmpBar();renderHistory()},0)};
