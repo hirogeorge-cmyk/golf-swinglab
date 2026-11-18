@@ -133,6 +133,8 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .hist-head h2{margin:0}
 .hist-usage{font-size:12px;color:var(--muted)}
 .hist-actions{margin-bottom:12px}
+.hist-warn{margin:0 0 12px}
+.hist-warn a{color:var(--accent)}
 .hist-list{display:flex;flex-direction:column;gap:8px}
 .hcard{position:relative;display:flex;align-items:stretch;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .hcard.sel{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
@@ -480,6 +482,7 @@ td.num{font-weight:600;letter-spacing:-.01em}
 <div id="view-history" class="view" hidden>
   <div class="hist-head"><h2>スイングの履歴</h2><span class="hist-usage" id="histUsage"></span></div>
   <p class="intro">解析した動画は、日付と一緒にこの端末の中だけに保存されます（外部には送信されません）。2本を選ぶと、並べて比較できます。</p>
+  <div class="notice hist-warn" id="histWarn" hidden><strong>ご注意</strong><span>この画面（Claudeアプリなどの中）では、アプリを閉じると履歴が消えることがあります。履歴を残すには、公開サイト <a href="https://hirogeorge-cmyk.github.io/golf-swinglab/" target="_blank" rel="noopener">hirogeorge-cmyk.github.io/golf-swinglab</a> をSafariで開き、「ホーム画面に追加」してお使いください。</span></div>
   <div class="hist-actions"><button class="btn primary" id="histCmpBtn">2本を選んで比較する</button></div>
   <div class="empty" id="histEmpty" hidden><p>まだ履歴がありません。「解析」タブで動画を選ぶと、ここに自動で保存されます。</p><a class="btn primary" href="#analyze">動画を選ぶ</a></div>
   <div class="hist-list" id="histList"></div>
@@ -1396,6 +1399,8 @@ async function openRecordMain(rec){
   $('notice').querySelector('strong').textContent='履歴';$('noticeText').textContent=`${fmtDate(rec.date).main} のスイングを開きました。${rec.memo?'メモ：'+rec.memo:''}`;
 }
 let histSel=null,posterUrls=[];
+const ON_SITE=/(^|\.)github\.io$/.test(location.hostname)||/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+$('histWarn').hidden=ON_SITE;
 const blobToDataURL=b=>new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>rej(fr.error);fr.readAsDataURL(b)});
 // older records kept the poster as a Blob; rebuild a data: URL from it (or from the stored frame thumbnails)
 async function makePosterUrl(r){
