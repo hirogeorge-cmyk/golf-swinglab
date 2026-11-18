@@ -1,26 +1,19 @@
 <title>スイングラボ</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
 <style>
-/* Layout: 練習場のヤーデージブック。左に動画ステージ、右に P-ポジション別の数値と診断、下に時系列の小さなグラフ3枚 */
+/* Layout: tour-level analysis desk. One committed dark look: deep green-charcoal, champagne-gold accent,
+   instrument-style numerals. Video stage on the left, readouts and diagnosis on the right. */
 :root{
-  --bg:#F1F4EE; --surface:#FFFFFF; --ink:#16201A; --muted:#5A675E; --line:#D8DFD4;
-  --accent:#2F7A4D; --accent-2:#B8790A; --accent-soft:#E2EEE4;
-  --good:#2E7D4F; --warn:#A86400; --bad:#B8362A;
-  --stage:#0E1410; --stage-ink:#E9F0EA;
-  --f-display:"Barlow Condensed","Noto Sans JP",system-ui,sans-serif;
-  --f-body:"Noto Sans JP","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
-  --r:10px;
+  --bg:#0B100D; --surface:#121915; --surface-2:#19221D; --ink:#EDEFE9; --muted:#8D988F; --line:rgba(237,239,233,.10);
+  --accent:#C9A86A; --accent-2:#7DB39A; --c1:#B08636; --c2:#3F95C2; --accent-soft:rgba(201,168,106,.12); --on-accent:#17130B;
+  --good:#62C08F; --warn:#E2A955; --bad:#E5705F;
+  --stage:#060907; --stage-ink:#E9F0EA;
+  --f-display:"Inter","Zen Kaku Gothic New",system-ui,sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --r:14px; color-scheme:dark;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0F1411; --surface:#161D18; --ink:#E6ECE7; --muted:#93A198; --line:#27322B;
-  --accent:#3E9C68; --accent-2:#BD7A1C; --accent-soft:#1C2A21;
-  --good:#4FAE78; --warn:#D9952B; --bad:#E0675A; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#0F1411; --surface:#161D18; --ink:#E6ECE7; --muted:#93A198; --line:#27322B;
-  --accent:#3E9C68; --accent-2:#BD7A1C; --accent-soft:#1C2A21;
-  --good:#4FAE78; --warn:#D9952B; --bad:#E0675A; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.6;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
@@ -72,7 +65,7 @@ a.btn{text-decoration:none}
 .toggles{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted)}
 .path-note{margin:0;font-size:12px;color:var(--muted);line-height:1.6}
 .path-note .sw{display:inline-block;width:16px;height:4px;border-radius:2px;vertical-align:middle;margin:0 4px 0 2px}
-.path-note .sw.g{background:#6FD39A}.path-note .sw.o{background:#FF9F43}
+.path-note .sw.g{background:#8FD3B0}.path-note .sw.o{background:#E8A15A}
 .toggles label{display:flex;gap:5px;align-items:center;cursor:pointer}
 .toggles input{accent-color:var(--accent)}
 .panel{display:flex;flex-direction:column;gap:18px;min-width:0}
@@ -173,10 +166,10 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 @media (max-width:760px){.fgrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.fcell .ft{font-size:12.5px;padding:3px 6px}}
 .fcell{all:unset;box-sizing:border-box;position:relative;display:block;cursor:pointer;border-radius:8px;overflow:hidden;background:var(--stage);aspect-ratio:3/4;border:2px solid transparent}
 .fcell canvas{display:block;width:100%;height:100%}
-.fcell.ph{border-color:#FFC94D}
+.fcell.ph{border-color:#E3C27A}
 .fcell:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .fcell .ft{position:absolute;left:0;right:0;bottom:0;padding:2px 5px;font:600 11px var(--f-display);color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.65));display:flex;justify-content:space-between;font-variant-numeric:tabular-nums}
-.fcell .ft b{color:#FFC94D}
+.fcell .ft b{color:#E3C27A}
 .lightbox{position:fixed;inset:0;z-index:50;background:rgba(6,9,7,.92);display:flex;align-items:center;justify-content:center;padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
 .lb-inner{display:flex;flex-direction:column;gap:10px;width:min(560px,100%);max-height:100%}
 .lb-head{display:flex;justify-content:space-between;align-items:center;color:#E9F0EA;font-weight:700}
@@ -214,7 +207,7 @@ canvas{-webkit-touch-callout:none}
 .empty{margin-top:28px;padding:40px 20px;text-align:center;border:2px dashed var(--line);border-radius:14px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:12px}
 .empty p{margin:0}
 .m-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--stage-ink);cursor:pointer;border:2px dashed rgba(233,240,234,.25);border-radius:var(--r);z-index:2}
-.m-empty:hover{border-color:#6FD39A}
+.m-empty:hover{border-color:var(--accent)}
 .m-empty .drop-sub{color:rgba(233,240,234,.6)}
 td.diff{font-family:var(--f-display);font-size:16px;font-variant-numeric:tabular-nums;color:var(--muted)}
 td.diff b{color:var(--ink);font-weight:600}
@@ -293,12 +286,54 @@ body.noscroll{overflow:hidden}
   .intro{font-size:13px;margin:12px 0 10px}
   .notice{font-size:12.5px}
 }
+/* ---- premium finish ---- */
+body{background:radial-gradient(1100px 520px at 50% -260px,rgba(201,168,106,.13),transparent 62%),var(--bg);letter-spacing:.01em}
+header.top{border-bottom:1px solid var(--line)}
+.brand{align-items:center;gap:14px}
+.brand h1{font-family:"Inter",sans-serif;font-weight:600;font-size:21px;letter-spacing:.26em;color:var(--ink)}
+.brand h1 b{color:var(--accent);font-weight:600}
+.brand span{font-family:"Inter",var(--f-body);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--line);padding-left:14px}
+h2{font-weight:600;letter-spacing:.02em}
+.btn{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;font-weight:600;letter-spacing:.03em}
+.btn:hover{border-color:rgba(201,168,106,.55)}
+.btn.primary,.cmpbar .btn.primary,.editbar .btn[aria-pressed="true"]{background:linear-gradient(180deg,#DCC08A,#B48D4C);border-color:transparent;color:var(--on-accent);box-shadow:0 6px 22px rgba(201,168,106,.22),inset 0 1px 0 rgba(255,255,255,.35)}
+.btn.primary:hover{filter:brightness(1.05)}
+.chip{background:var(--surface-2);border-color:var(--line)}
+.notice{background:var(--accent-soft);border:1px solid rgba(201,168,106,.22)}
+.notice strong{color:var(--accent);letter-spacing:.06em}
+.kpis{background:var(--line);border-color:var(--line);border-radius:var(--r)}
+.kpi{background:var(--surface)}
+.kpi .k{letter-spacing:.08em}
+.kpi .v{font-weight:600;letter-spacing:-.02em}
+.kpi .v small{font-weight:500}
+.tbl-wrap,.chart,.diag li button,.phase,.hcard,.setcard{background:var(--surface);border-color:var(--line);border-radius:var(--r)}
+th,td{border-bottom-color:var(--line)}
+td.num{font-weight:600;letter-spacing:-.01em}
+.phase.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.phase b{font-weight:600}
+.drop{border:1px solid var(--line);background:radial-gradient(420px 220px at 50% 0%,rgba(201,168,106,.12),transparent 70%),var(--surface)}
+.drop:hover,.drop.drag{border-color:rgba(201,168,106,.6);background:radial-gradient(420px 220px at 50% 0%,rgba(201,168,106,.18),transparent 70%),var(--surface)}
+.drop-icon{color:var(--accent)}
+.drop-title{font-weight:600;letter-spacing:.04em}
+.stage,.stage2,.strip{box-shadow:0 0 0 1px var(--line)}
+.tabs{border-bottom-color:var(--line)}
+.tabs a{letter-spacing:.06em}
+.seg{background:var(--bg)}
+.seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--accent);box-shadow:0 0 0 1px rgba(201,168,106,.35)}
+.hc-check{color:var(--on-accent)}
+.fcell.ph{border-color:var(--accent)}
+.fcell .ft b{color:var(--accent)}
+.howto b{letter-spacing:.04em}
+.sheet{background:var(--surface);box-shadow:0 -10px 40px rgba(0,0,0,.55),0 0 0 1px var(--line)}
+@media (max-width:760px){.tabs{background:rgba(11,16,13,.82);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+  .tabs a[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
+  .brand span{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
 <div class="wrap">
 <header class="top">
-  <div class="brand"><h1>SWING<b>LAB</b></h1><span>ゴルフスイング動作解析</span></div>
+  <div class="brand"><h1>SWING<b>LAB</b></h1><span>Golf Swing Analytics</span></div>
   <div class="head-actions">
     <button class="chip" id="setBtn" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="16" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/></svg><span id="setSummary">設定</span></button>
     <label class="btn primary head-pick" for="file">動画を選ぶ</label>
@@ -362,7 +397,7 @@ body.noscroll{overflow:hidden}
     <ol class="steps">
       <li><b>利き手・撮影方向・身長</b>を画面上部で合わせます。あとから変えても再計算されます。</li>
       <li><b>全身が映った動画</b>を選びます。頭から足先、トップのクラブまで入っていると精度が上がります。</li>
-      <li>解析が終わると、骨格を重ねた動画・数値・診断が表示されます。<b>元動画と並べる</b>・<b>お手本と比較</b>のタブも使えるようになります。</li>
+      <li>解析が終わると、骨格を重ねた動画・数値・診断が表示されます。<b>コマ送り</b>・<b>比較</b>のタブも使え、スイングは<b>履歴</b>に日付つきで保存されます。</li>
     </ol>
   </div>
 </section>
@@ -773,9 +808,9 @@ function niceTicks(min,max,n=4){const span=(max-min)||1,s0=span/n,mag=10**Math.f
 function buildCharts(){
   const A=S.A, face=A.view==='face';
   const defs=[
-    {title:A.shA?'肩と腰の回転':(A.view==='dtl'?'肩と腰の回転（参考値）':'肩と腰の回転（参考値・実際より小さく出ます）'),unit:'°',series:A.view==='dtl'&&!A.shA?[{label:'肩',v:A.shBest,c:'--accent'}]:[{label:'肩',v:A.shBest,c:'--accent'},{label:'腰',v:A.hpBest,c:'--accent-2',dash:true}]},
-    face?{title:'頭の移動（左右）',unit:'cm',series:[{label:'頭',v:A.headSide,c:'--accent'}]}:{title:'前傾角',unit:'°',series:[{label:'前傾角',v:A.spine,c:'--accent'}]},
-    {title:'手のスピード（低めに出ます）',unit:'m/s',series:[{label:'スピード',v:A.speed,c:'--accent'}]}
+    {title:A.shA?'肩と腰の回転':(A.view==='dtl'?'肩と腰の回転（参考値）':'肩と腰の回転（参考値・実際より小さく出ます）'),unit:'°',series:A.view==='dtl'&&!A.shA?[{label:'肩',v:A.shBest,c:'--c1'}]:[{label:'肩',v:A.shBest,c:'--c1'},{label:'腰',v:A.hpBest,c:'--c2',dash:true}]},
+    face?{title:'頭の移動（左右）',unit:'cm',series:[{label:'頭',v:A.headSide,c:'--c1'}]}:{title:'前傾角',unit:'°',series:[{label:'前傾角',v:A.spine,c:'--c1'}]},
+    {title:'手のスピード（低めに出ます）',unit:'m/s',series:[{label:'スピード',v:A.speed,c:'--c1'}]}
   ];
   const root=$('charts');root.innerHTML='';charts=[];
   defs.forEach(d=>{
@@ -801,7 +836,7 @@ function drawChart(c){
   const tk=niceTicks(mn,mx,4);
   const l=36,r=10+(c.d.series.length>1?18:0),t=16,b=20;const g={l,w:w-l-r,x0:F[0].t,x1:F[F.length-1].t};c.g=g;
   const X=tt=>l+(tt-g.x0)/(g.x1-g.x0||1)*g.w, Y=v=>t+(1-(v-tk.lo)/(tk.hi-tk.lo||1))*(h-t-b);
-  x.font='11px "Barlow Condensed", system-ui, sans-serif';x.textBaseline='middle';
+  x.font='11px "Inter", system-ui, sans-serif';x.textBaseline='middle';
   tk.t.forEach(v=>{x.strokeStyle=line;x.lineWidth=1;x.beginPath();x.moveTo(l,Math.round(Y(v))+.5);x.lineTo(w-r,Math.round(Y(v))+.5);x.stroke();x.fillStyle=muted;x.textAlign='right';x.fillText(v,l-6,Y(v))});
   // x ticks (seconds)
   x.textAlign='center';x.textBaseline='top';const span=g.x1-g.x0,st=span>6?2:span>2.5?1:.5;
@@ -857,18 +892,18 @@ function drawSwing(cv,sw,i,o){
   if(o.spine){const p0=F[P[1]].p,h0=mid(p0[23],p0[24]),s0=mid(p0[11],p0[12]);const dx=s0[0]-h0[0],dy=s0[1]-h0[1];
     x.strokeStyle='rgba(233,240,234,.6)';x.setLineDash([u*3,u*2.5]);x.lineWidth=u*.8;x.beginPath();x.moveTo(h0[0]-dx*.35,h0[1]-dy*.35);x.lineTo(s0[0]+dx*.55,s0[1]+dy*.55);x.stroke();x.setLineDash([]);}
   if(o.head){const n0=A.h0,hcur=[(p[0][0]+p[7][0]+p[8][0])/3,(p[0][1]+p[7][1]+p[8][1])/3],rr=A.headR,far=dist(hcur,n0)>rr;
-    x.strokeStyle=far?'#FF9F43':'#6FD39A';x.lineWidth=u*.9;x.beginPath();x.arc(n0[0],n0[1],rr,0,7);x.stroke();}
+    x.strokeStyle=far?'#E8A15A':'#8FD3B0';x.lineWidth=u*.9;x.beginPath();x.arc(n0[0],n0[1],rr,0,7);x.stroke();}
   if(o.path){x.lineWidth=u*1.1;x.lineCap='round';
-    for(let j=Math.max(P[1],0)+1;j<=i;j++){const a=A.hands[j-1],b=A.hands[j];x.strokeStyle=j<=P[4]?'#6FD39A':(j<=P[7]?'#FF9F43':'rgba(255,159,67,.5)');x.beginPath();x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1]);x.stroke();}}
-  if(o.skel){x.lineCap='round';x.lineWidth=u*1.5;x.strokeStyle='#FFC94D';
+    for(let j=Math.max(P[1],0)+1;j<=i;j++){const a=A.hands[j-1],b=A.hands[j];x.strokeStyle=j<=P[4]?'#8FD3B0':(j<=P[7]?'#E8A15A':'rgba(232,161,90,.5)');x.beginPath();x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1]);x.stroke();}}
+  if(o.skel){x.lineCap='round';x.lineWidth=u*1.5;x.strokeStyle='#E3C27A';
     BONES.forEach(([a,b])=>{x.beginPath();x.moveTo(p[a][0],p[a][1]);x.lineTo(p[b][0],p[b][1]);x.stroke()});
     const sh=mid(p[11],p[12]);x.beginPath();x.moveTo(sh[0],sh[1]);x.lineTo(p[0][0],p[0][1]);x.stroke();
     JOINTS.forEach(j=>{x.fillStyle='#FFFFFF';x.beginPath();x.arc(p[j][0],p[j][1],u*1.5,0,7);x.fill()});
-    if(A.view!=='face'&&!o.mirror){const e=p[A.lead.e];x.font=`700 ${u*8}px "Barlow Condensed", sans-serif`;x.textAlign='left';x.textBaseline='middle';
+    if(A.view!=='face'&&!o.mirror){const e=p[A.lead.e];x.font=`700 ${u*8}px "Inter", sans-serif`;x.textAlign='left';x.textBaseline='middle';
       const txt=f0(A.leadElbow[i])+'°';x.lineWidth=u*2.2;x.strokeStyle='rgba(0,0,0,.65)';x.strokeText(txt,e[0]+u*4,e[1]);x.fillStyle='#FFFFFF';x.fillText(txt,e[0]+u*4,e[1]);}}
   if(o.edit){const ed=(sw.edits||{})[i]||{};x.lineWidth=u*0.9;
     EDIT_J.forEach(j=>{x.beginPath();x.arc(p[j][0],p[j][1],u*5,0,7);x.fillStyle=ed[j]?'rgba(84,200,255,.45)':'rgba(255,255,255,.18)';x.fill();x.strokeStyle=ed[j]?'#54C8FF':'#FFFFFF';x.stroke()});}
-  if(sw.source!=='video'){x.setTransform(1,0,0,1,0,0);x.fillStyle='rgba(233,240,234,.4)';x.font=`600 ${cw/24}px "Barlow Condensed", sans-serif`;x.textAlign='left';x.textBaseline='top';x.fillText('SAMPLE · 合成データ',cw*.04,ch*.03);}
+  if(sw.source!=='video'){x.setTransform(1,0,0,1,0,0);x.fillStyle='rgba(233,240,234,.4)';x.font=`600 ${cw/24}px "Inter", sans-serif`;x.textAlign='left';x.textBaseline='top';x.fillText('SAMPLE · 合成データ',cw*.04,ch*.03);}
 }
 const EDIT_J=[0,11,12,13,14,15,16,23,24,25,26,27,28];
 let editMode=false,dragJ=null;
@@ -893,10 +928,10 @@ function drawStrip(el,sw,t0,t1,tCur,opts={}){
     x.fillStyle='rgba(0,0,0,.12)';for(let k=1;k<n;k++)x.fillRect(Math.round(k*w/n),0,1,h);}
   const X=t=>clamp((t-t0)/span,0,1)*w;
   // phase marks
-  x.font='700 11px "Barlow Condensed", system-ui, sans-serif';x.textBaseline='top';x.textAlign='center';
+  x.font='700 11px "Inter", system-ui, sans-serif';x.textBaseline='top';x.textAlign='center';
   let lastLab=-1e9;[1,4,7,10].forEach(k=>{const t=sw.frames[sw.A.P[k]].t;if(t<t0||t>t1)return;const px=Math.round(X(t))+.5;
-    x.fillStyle='rgba(255,201,77,.95)';x.fillRect(px-0.5,0,1.5,h);const lab='P'+k,tw2=x.measureText(lab).width+8;if(px-lastLab<tw2+2)return;lastLab=px;
-    x.fillStyle='rgba(14,20,16,.85)';x.fillRect(px-tw2/2,0,tw2,15);x.fillStyle='#FFC94D';x.fillText(lab,px,2)});
+    x.fillStyle='rgba(227,194,122,.95)';x.fillRect(px-0.5,0,1.5,h);const lab='P'+k,tw2=x.measureText(lab).width+8;if(px-lastLab<tw2+2)return;lastLab=px;
+    x.fillStyle='rgba(14,20,16,.85)';x.fillRect(px-tw2/2,0,tw2,15);x.fillStyle='#E3C27A';x.fillText(lab,px,2)});
   // playhead
   const px=X(tCur);x.fillStyle='rgba(0,0,0,.35)';x.fillRect(px-3,0,6,h);x.fillStyle='#FFFFFF';x.fillRect(px-1.5,0,3,h);
   x.beginPath();x.arc(px,h-7,6,0,7);x.fill();
@@ -1171,7 +1206,7 @@ $('gdSave').onclick=async()=>{if(!S.A)return;const cells=[...$('fgrid').querySel
   const out=document.createElement('canvas');out.width=cols*cw;out.height=rows*(chh+lab)+50;const x=out.getContext('2d');x.fillStyle='#0E1410';x.fillRect(0,0,out.width,out.height);
   x.fillStyle='#E9F0EA';x.font='700 24px "Noto Sans JP", sans-serif';x.textBaseline='middle';x.fillText(`SWINGLAB　${S.name||''}`,14,25);
   cells.forEach((c,k)=>{const cx=(k%cols)*cw,cy=50+Math.floor(k/cols)*(chh+lab);x.drawImage(c,cx+2,cy,cw-4,chh);const i=gridIdx[k],ph=phaseOf(i),t=relT(i);
-    if(ph){x.strokeStyle='#FFC94D';x.lineWidth=4;x.strokeRect(cx+4,cy+2,cw-8,chh-4)}x.fillStyle=ph?'#FFC94D':'rgba(233,240,234,.8)';x.font='600 17px "Noto Sans JP", sans-serif';x.fillText(`${t>=0?'+':''}${t.toFixed(2)}s ${ph}`,cx+8,cy+chh+lab/2)});
+    if(ph){x.strokeStyle='#E3C27A';x.lineWidth=4;x.strokeRect(cx+4,cy+2,cw-8,chh-4)}x.fillStyle=ph?'#E3C27A':'rgba(233,240,234,.8)';x.font='600 17px "Noto Sans JP", sans-serif';x.fillText(`${t>=0?'+':''}${t.toFixed(2)}s ${ph}`,cx+8,cy+chh+lab/2)});
   const blob=await new Promise(r=>out.toBlob(r,'image/png'));$('gdMsg').textContent=saveMsg(await offerFile(`swing-frames-${stamp()}.png`,blob))};
 
 /* ---------- model (お手本) ---------- */
@@ -1258,7 +1293,7 @@ async function composeFrame(i,out){
   if(M.A)put(tmpA,7);put(tmpB,OUT_W/2+3);
   x.fillStyle='#E9F0EA';x.font='700 28px "Noto Sans JP", sans-serif';x.textBaseline='middle';x.textAlign='left';
   x.fillText(M.label||'お手本',16,TOP/2);x.fillText(S.label||'自分',OUT_W/2+12,TOP/2);
-  x.textAlign='right';x.fillStyle='rgba(233,240,234,.55)';x.font='600 22px "Barlow Condensed", sans-serif';x.fillText('SWINGLAB',OUT_W-16,TOP/2);
+  x.textAlign='right';x.fillStyle='rgba(233,240,234,.55)';x.font='600 22px "Inter", sans-serif';x.fillText('SWING LAB',OUT_W-16,TOP/2);
   const sec=(S.frames[i].t-S.frames[S.A.P[1]].t)/S.cfg.slow;
   let ph='';for(const [k,l] of [[1,'アドレス'],[4,'トップ'],[7,'インパクト'],[10,'フィニッシュ']]) if(i>=S.A.P[k])ph=`P${k} ${l}`;
   x.textAlign='left';x.fillStyle='#E9F0EA';x.font='600 24px "Noto Sans JP", sans-serif';x.textBaseline='middle';
