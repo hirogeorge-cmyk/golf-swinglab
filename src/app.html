@@ -140,7 +140,7 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .gd-opt{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink);cursor:pointer}
 .gd-opt input{accent-color:var(--accent)}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px}
-@media (max-width:760px){.fgrid{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}}
+@media (max-width:760px){.fgrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.fcell .ft{font-size:12.5px;padding:3px 6px}}
 .fcell{all:unset;box-sizing:border-box;position:relative;display:block;cursor:pointer;border-radius:8px;overflow:hidden;background:var(--stage);aspect-ratio:3/4;border:2px solid transparent}
 .fcell canvas{display:block;width:100%;height:100%}
 .fcell.ph{border-color:#FFC94D}
@@ -153,6 +153,11 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .lb-inner canvas{width:100%;height:auto;max-height:72vh;object-fit:contain;border-radius:10px;background:#0E1410}
 .lb-nav{display:flex;justify-content:space-between;align-items:center;color:rgba(233,240,234,.7);font-size:12px}
 .lightbox .btn{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff}
+.lb-nav .btn{width:64px;min-height:52px;font-size:20px}
+.lb-inner canvas{touch-action:none;cursor:grab}
+/* no text selection / callout / double-tap zoom when tapping controls quickly */
+button,.btn,.phase,.fcell,.strip,.tabs a,.seg button,.lightbox,.lightbox *,.chip{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+canvas{-webkit-touch-callout:none}
 .exportbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px}
 .exportbar .btn:disabled{opacity:.55;cursor:default}
 .export-msg{font-size:12.5px;color:var(--muted)}
@@ -399,7 +404,7 @@ body.noscroll{overflow:hidden}
     <label class="gd-opt"><input type="checkbox" id="gdSkel">骨格を重ねる</label>
     <button class="btn" id="gdSave">画像で保存</button>
     <span class="export-msg" id="gdMsg" role="status"></span>
-    <select id="gdCount" hidden><option value="12">12</option><option value="24" selected>24</option><option value="36">36</option></select>
+    <select id="gdCount" hidden><option value="12" selected>12</option><option value="24">24</option><option value="36">36</option></select>
   </div>
   <div class="fgrid" id="fgrid"></div>
   </div>
@@ -408,7 +413,7 @@ body.noscroll{overflow:hidden}
   <div class="lb-inner">
     <div class="lb-head"><span id="lbCap"></span><button class="btn icon-btn lb-close" id="lbClose" aria-label="閉じる">✕</button></div>
     <canvas id="lbCv"></canvas>
-    <div class="lb-nav"><button class="btn icon-btn" id="lbPrev" aria-label="1コマ戻る">◀︎</button><span class="lb-hint">1コマずつ移動</span><button class="btn icon-btn" id="lbNext" aria-label="1コマ進む">▶︎</button></div>
+    <div class="lb-nav"><button class="btn icon-btn" id="lbPrev" aria-label="1コマ戻る">◀︎</button><span class="lb-hint">画像を左右になぞってもコマ送りできます</span><button class="btn icon-btn" id="lbNext" aria-label="1コマ進む">▶︎</button></div>
   </div>
 </div>
 
@@ -1105,6 +1110,11 @@ async function renderGrid(){
 async function drawLB(){const i=lbI;await seekVid(S,S.frames[i].t);if(i!==lbI)return;drawSwing($('lbCv'),S,i,gOpts());const ph=phaseOf(i),t=relT(i);$('lbCap').textContent=`${ph?ph+'　':''}始動から ${t>=0?'+':''}${t.toFixed(2)} 秒`}
 function openLB(i){lbI=i;$('lb').hidden=false;document.body.classList.add('noscroll');drawLB();$('lbClose').focus()}
 function closeLB(){$('lb').hidden=true;document.body.classList.remove('noscroll')}
+// drag sideways on the enlarged frame to step through frames (about one frame per 14px)
+{let sx=null,si=0;const cv=$('lbCv');
+  cv.addEventListener('pointerdown',e=>{sx=e.clientX;si=lbI;cv.setPointerCapture(e.pointerId);e.preventDefault()});
+  cv.addEventListener('pointermove',e=>{if(sx==null)return;const ni=clamp(si-Math.round((e.clientX-sx)/14),0,S.frames.length-1);if(ni!==lbI){lbI=ni;drawLB()}});
+  const end=()=>{sx=null};cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);}
 $('lbClose').onclick=closeLB;$('lb').addEventListener('click',e=>{if(e.target.id==='lb')closeLB()});
 $('lbPrev').onclick=()=>{lbI=clamp(lbI-1,0,S.frames.length-1);drawLB()};$('lbNext').onclick=()=>{lbI=clamp(lbI+1,0,S.frames.length-1);drawLB()};
 $('gdSkel').onchange=()=>renderGrid();$('gdCount').addEventListener('change',()=>renderGrid());
