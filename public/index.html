@@ -510,7 +510,7 @@ td.num{font-weight:600;letter-spacing:-.01em}
   <div class="hist-list" id="histList"></div>
   <section class="backup" aria-labelledby="bkTitle">
     <h2 id="bkTitle">バックアップ</h2>
-    <p class="intro">機種変更やデータの消去に備えて、履歴（動画・数値・メモ）を1つのファイルに書き出しておけます。iPhoneでは「ファイル」アプリのiCloud Driveに保存しておくと安心です。新しい端末では、そのファイルを読み込めば履歴が戻ります。zipファイルを開いて展開してしまった場合は、「展開したフォルダから読み込む」で、manifest.json と videos フォルダが入っているフォルダを選んでください。</p>
+    <p class="intro">機種変更やデータの消去に備えて、履歴（動画・数値・メモ）を1つのファイルに書き出しておけます。iPhoneでは「ファイル」アプリのiCloud Driveに保存しておくと安心です。新しい端末では、そのファイルを読み込めば履歴が戻ります。zipファイルを開いて展開してしまった場合は、「展開したフォルダから読み込む」で、manifest.json と videos フォルダが入っているフォルダ（videos の1つ上）を選んでください。ブラウザに「アップロードしますか」と表示されますが、ファイルは端末の外には送られません。</p>
     <div class="hist-actions"><button class="btn" id="bkExport">バックアップを書き出す</button><label class="btn" for="bkFile">バックアップから読み込む</label><label class="btn bk-dir" for="bkDir">展開したフォルダから読み込む</label>
       <input type="file" id="bkFile" multiple hidden><input type="file" id="bkDir" webkitdirectory multiple hidden><span class="export-msg" id="bkMsg" role="status"></span></div>
   </section>
@@ -1602,7 +1602,7 @@ async function importBackup(fileList){
       return importRecords(JSON.parse(new TextDecoder().decode(z['manifest.json'])),async n=>z[n])}}
   // unpacked backup: manifest.json + the video files (picked together, or as a folder)
   const man=files.find(f=>f.name==='manifest.json');
-  if(!man)throw new Error(files.length===1?'バックアップのzipファイル（swinglab-backup-….zip）を選んでください。':'選んだ中に manifest.json がありません。展開したフォルダ全体を選んでください。');
+  if(!man)throw new Error(files.length===1?'バックアップのzipファイル（swinglab-backup-….zip）を選んでください。':(files.some(f=>(f.webkitRelativePath||'').split('/')[0]==='videos')?'「videos」フォルダではなく、その1つ上のフォルダ（swinglab-backup-…）を選んでください。または、ダウンロードフォルダにある swinglab-backup-….zip を「バックアップから読み込む」で選んでください。':'選んだ中に manifest.json がありません。manifest.json と videos フォルダが入っているフォルダを選んでください。'));
   const byName={};files.forEach(f=>{byName[f.name]=f});
   const m=JSON.parse(await man.text());
   return importRecords(m,async n=>{const f=byName[(n||'').split('/').pop()];return f?new Uint8Array(await f.arrayBuffer()):null});
