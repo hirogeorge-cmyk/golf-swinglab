@@ -1,5 +1,5 @@
 // Offline support: cache the heavy engine files once, keep the page itself fresh.
-const CACHE = 'swinglab-v29';
+const CACHE = 'swinglab-v30';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
   'vendor/vision_bundle.mjs', 'vendor/vision_wasm_internal.js', 'vendor/mp4-muxer.js', 'vendor/ort.webgpu.min.js', 'vendor/ort-wasm-simd-threaded.jsep.mjs',
   'ort/jsep.0.wasm', 'ort/jsep.1.wasm', 'model/rtm.0.wasm', 'model/rtm.1.wasm', 'model/rtm.2.wasm', 'model/rtm.3.wasm',
