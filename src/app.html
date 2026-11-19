@@ -134,6 +134,8 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .hist-usage{font-size:12px;color:var(--muted)}
 .hist-actions{margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .hist-warn{margin:0 0 12px}
+.backup{margin-top:28px;padding-top:18px;border-top:1px solid var(--line)}
+.backup .intro{margin-top:4px}
 .hist-warn a{color:var(--accent)}
 .hist-list{display:flex;flex-direction:column;gap:8px}
 .hcard{position:relative;display:flex;align-items:stretch;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -489,6 +491,12 @@ td.num{font-weight:600;letter-spacing:-.01em}
   <div class="hist-actions"><button class="btn primary" id="histCmpBtn">2本を選んで比較する</button><button class="btn" id="histShrink" hidden>古い履歴の容量を減らす</button><span class="export-msg" id="shrinkMsg" role="status"></span></div>
   <div class="empty" id="histEmpty" hidden><p>まだ履歴がありません。「解析」タブで動画を選ぶと、ここに自動で保存されます。</p><a class="btn primary" href="#analyze">動画を選ぶ</a></div>
   <div class="hist-list" id="histList"></div>
+  <section class="backup" aria-labelledby="bkTitle">
+    <h2 id="bkTitle">バックアップ</h2>
+    <p class="intro">機種変更やデータの消去に備えて、履歴（動画・数値・メモ）を1つのファイルに書き出しておけます。iPhoneでは「ファイル」アプリのiCloud Driveに保存しておくと安心です。新しい端末では、そのファイルを読み込めば履歴が戻ります。</p>
+    <div class="hist-actions"><button class="btn" id="bkExport">バックアップを書き出す</button><label class="btn" for="bkFile">バックアップから読み込む</label>
+      <input type="file" id="bkFile" accept=".zip,application/zip" hidden><span class="export-msg" id="bkMsg" role="status"></span></div>
+  </section>
   <div class="cmpbar" id="cmpBar" hidden><span id="cmpCount">比べる2本をタップして選んでください（0/2）</span><div class="cmpbar-btns"><button class="btn" id="cmpCancel">やめる</button><button class="btn primary" id="cmpGo" disabled>この2本を比べる</button></div></div>
 </div>
 <section class="sheet" id="hSheet" role="dialog" aria-modal="true" aria-labelledby="hTitle" hidden>
@@ -1511,6 +1519,69 @@ async function renderHistory(){
 const alertMsg=t=>{$('cmpCount').textContent=t};
 function toast(t){let el=$('toast');if(!el){el=document.createElement('div');el.id='toast';el.className='toast';el.setAttribute('role','status');document.body.appendChild(el)}el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>{el.hidden=true},5000)}
 function updCmpBar(){$('cmpBar').hidden=!histSel;if(!histSel)return;$('cmpCount').textContent=`比べる2本をタップして選んでください（${histSel.length}/2）`;$('cmpGo').disabled=histSel.length!==2}
+/* ---------- backup: one .zip with manifest.json + the videos (stored, no compression) ---------- */
+const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(u8){let c=0xFFFFFFFF;for(let i=0;i<u8.length;i++)c=CRC_T[(c^u8[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0}
+function makeZip(files){
+  const enc=new TextEncoder(),parts=[],central=[];let off=0;
+  for(const f of files){const nm=enc.encode(f.name),crc=crc32(f.data),sz=f.data.length;
+    const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(12,0x21,true);
+    h.setUint32(14,crc,true);h.setUint32(18,sz,true);h.setUint32(22,sz,true);h.setUint16(26,nm.length,true);parts.push(h,nm,f.data);
+    const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(14,0x21,true);
+    c.setUint32(16,crc,true);c.setUint32(20,sz,true);c.setUint32(24,sz,true);c.setUint16(28,nm.length,true);c.setUint32(42,off,true);central.push(c,nm);
+    off+=30+nm.length+sz;}
+  let csz=0;central.forEach(x=>csz+=x.byteLength);
+  const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,csz,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...central,e],{type:'application/zip'});
+}
+async function readZip(file){
+  const buf=new Uint8Array(await file.arrayBuffer()),dv=new DataView(buf.buffer),dec=new TextDecoder();
+  let e=-1;for(let i=buf.length-22;i>=Math.max(0,buf.length-65557);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break}}
+  if(e<0)throw new Error('バックアップのファイルではないようです。');
+  const n=dv.getUint16(e+10,true),out={};let p=dv.getUint32(e+16,true);
+  for(let k=0;k<n;k++){const method=dv.getUint16(p+10,true),csz=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true);
+    const name=dec.decode(buf.subarray(p+46,p+46+nl)),ds=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true);let data=buf.subarray(ds,ds+csz);
+    if(method===8){if(!window.DecompressionStream)throw new Error('このブラウザでは圧縮されたファイルを読み込めません。');
+      data=new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())}
+    else if(method!==0)throw new Error('読み込めない形式のファイルです。');
+    out[name]=data;p+=46+nl+xl+cl;}
+  return out;
+}
+const bkMsg=t=>{$('bkMsg').textContent=t};
+async function exportBackup(){
+  const list=await hAll();if(!list.length){bkMsg('書き出す履歴がありません。');return}
+  const files=[],recs=[];let k=0;
+  for(const r of list){k++;bkMsg(`書き出しの準備中… ${k}/${list.length}本`);
+    const v=await hVideo(r.id);const u8=v&&(v.buf?new Uint8Array(v.buf):v.blob?new Uint8Array(await v.blob.arrayBuffer()):null);if(!u8||!u8.length)continue;
+    const type=(v&&v.type)||'video/mp4',name=`videos/${r.id}.${/webm/.test(type)?'webm':/quicktime/.test(type)?'mov':'mp4'}`;files.push({name,data:u8});
+    const rec={...r};delete rec.poster;
+    rec.thumbs=await Promise.all((r.thumbs||[]).map(async th=>th.url?th:{t:th.t,url:th.blob?await blobToDataURL(th.blob):''}));
+    if(!rec.posterUrl)rec.posterUrl=await makePosterUrl(r);
+    recs.push({...rec,video:name,videoType:type});}
+  files.unshift({name:'manifest.json',data:new TextEncoder().encode(JSON.stringify({app:'swinglab',version:1,exported:new Date().toISOString(),records:recs}))});
+  bkMsg('ファイルを作成中…');
+  const blob=makeZip(files),fname=`swinglab-backup-${stamp().slice(0,8)}.zip`,mb=(blob.size/1e6).toFixed(1);
+  // iPhone/Android: the share sheet lets the file go to Files / iCloud Drive; elsewhere a normal download
+  const fileObj=new File([blob],fname,{type:'application/zip'});
+  if(!window.claude&&matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[fileObj]})){
+    try{await navigator.share({files:[fileObj],title:'SwingLab バックアップ'});bkMsg(`${recs.length}本・約${mb}MBのバックアップを書き出しました。`);}
+    catch(e){bkMsg(e&&e.name==='AbortError'?'書き出しを取りやめました。':'書き出せませんでした。')}
+    return}
+  const r=await offerFile(fname,blob);bkMsg(r==='saved'?`${recs.length}本・約${mb}MBのバックアップを書き出しました。`:saveMsg(r));
+}
+async function importBackup(file){
+  bkMsg('読み込み中…');
+  const z=await readZip(file);if(!z['manifest.json'])throw new Error('SwingLabのバックアップではないようです。');
+  const m=JSON.parse(new TextDecoder().decode(z['manifest.json']));if(m.app!=='swinglab'||!Array.isArray(m.records))throw new Error('SwingLabのバックアップではないようです。');
+  const have=new Set((await hAll()).map(r=>r.id));let added=0,skipped=0,k=0;
+  for(const r of m.records){k++;bkMsg(`読み込み中… ${k}/${m.records.length}本`);
+    if(have.has(r.id)){skipped++;continue}const data=z[r.video];if(!data){skipped++;continue}
+    const rec={...r};const type=rec.videoType||'video/mp4';delete rec.video;delete rec.videoType;
+    await hPut(rec,{buf:data.slice().buffer,type});added++;}
+  bkMsg(`${added}本の履歴を読み込みました。${skipped?`（${skipped}本はすでにあるため、そのままにしました）`:''}`);renderHistory();
+}
+$('bkExport').onclick=async()=>{const b=$('bkExport');b.disabled=true;try{await exportBackup()}catch(e){console.error(e);bkMsg('書き出せませんでした：'+(e.message||''))}b.disabled=false};
+$('bkFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{await importBackup(f)}catch(err){console.error(err);bkMsg(err.message||'読み込めませんでした。')}};
 $('histShrink').onclick=async()=>{const b=$('histShrink');b.disabled=true;
   try{const r=await shrinkOld((d,n)=>{$('shrinkMsg').textContent=`容量を減らしています… ${Math.min(n,Math.floor(d)+1)}/${n}本（${Math.round(d/n*100)}%）`});
     $('shrinkMsg').textContent=r.saved>0?`約${Math.round(r.saved/1e6)}MB減らしました。`:'減らせる履歴はありませんでした。'}catch(e){console.error(e);$('shrinkMsg').textContent='容量を減らせませんでした。'}
