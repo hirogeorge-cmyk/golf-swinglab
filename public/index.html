@@ -149,6 +149,7 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .hist-warn{margin:0 0 12px}
 .backup{margin-top:28px;padding-top:18px;border-top:1px solid var(--line)}
 .backup .intro{margin-top:4px}
+@media (pointer:coarse){.bk-dir{display:none}}
 .hist-warn a{color:var(--accent)}
 .hist-list{display:flex;flex-direction:column;gap:8px}
 .hcard{position:relative;display:flex;align-items:stretch;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -509,9 +510,9 @@ td.num{font-weight:600;letter-spacing:-.01em}
   <div class="hist-list" id="histList"></div>
   <section class="backup" aria-labelledby="bkTitle">
     <h2 id="bkTitle">バックアップ</h2>
-    <p class="intro">機種変更やデータの消去に備えて、履歴（動画・数値・メモ）を1つのファイルに書き出しておけます。iPhoneでは「ファイル」アプリのiCloud Driveに保存しておくと安心です。新しい端末では、そのファイルを読み込めば履歴が戻ります。</p>
-    <div class="hist-actions"><button class="btn" id="bkExport">バックアップを書き出す</button><label class="btn" for="bkFile">バックアップから読み込む</label>
-      <input type="file" id="bkFile" accept=".zip,application/zip" hidden><span class="export-msg" id="bkMsg" role="status"></span></div>
+    <p class="intro">機種変更やデータの消去に備えて、履歴（動画・数値・メモ）を1つのファイルに書き出しておけます。iPhoneでは「ファイル」アプリのiCloud Driveに保存しておくと安心です。新しい端末では、そのファイルを読み込めば履歴が戻ります。zipファイルを開いて展開してしまった場合は、「展開したフォルダから読み込む」で、manifest.json と videos フォルダが入っているフォルダを選んでください。</p>
+    <div class="hist-actions"><button class="btn" id="bkExport">バックアップを書き出す</button><label class="btn" for="bkFile">バックアップから読み込む</label><label class="btn bk-dir" for="bkDir">展開したフォルダから読み込む</label>
+      <input type="file" id="bkFile" multiple hidden><input type="file" id="bkDir" webkitdirectory multiple hidden><span class="export-msg" id="bkMsg" role="status"></span></div>
   </section>
   <div class="cmpbar" id="cmpBar" hidden><span id="cmpCount">比べる2本をタップして選んでください（0/2）</span><div class="cmpbar-btns"><button class="btn" id="cmpCancel">やめる</button><button class="btn primary" id="cmpGo" disabled>この2本を比べる</button></div></div>
 </div>
@@ -1585,19 +1586,29 @@ async function exportBackup(){
     return}
   const r=await offerFile(fname,blob);bkMsg(r==='saved'?`${recs.length}本・約${mb}MBのバックアップを書き出しました。`:saveMsg(r));
 }
-async function importBackup(file){
-  bkMsg('読み込み中…');
-  const z=await readZip(file);if(!z['manifest.json'])throw new Error('SwingLabのバックアップではないようです。');
-  const m=JSON.parse(new TextDecoder().decode(z['manifest.json']));if(m.app!=='swinglab'||!Array.isArray(m.records))throw new Error('SwingLabのバックアップではないようです。');
-  const have=new Set((await hAll()).map(r=>r.id));let added=0,skipped=0,k=0;
+async function importRecords(m,getVideo){
+  if(!m||m.app!=='swinglab'||!Array.isArray(m.records))throw new Error('SwingLabのバックアップではないようです。');
+  const have=new Set((await hAll()).map(r=>r.id));let added=0,skipped=0,missing=0,k=0;
   for(const r of m.records){k++;bkMsg(`読み込み中… ${k}/${m.records.length}本`);
-    if(have.has(r.id)){skipped++;continue}const data=z[r.video];if(!data){skipped++;continue}
+    if(have.has(r.id)){skipped++;continue}const data=await getVideo(r.video);if(!data||!data.length){missing++;continue}
     const rec={...r};const type=rec.videoType||'video/mp4';delete rec.video;delete rec.videoType;
     await hPut(rec,{buf:data.slice().buffer,type});added++;}
-  bkMsg(`${added}本の履歴を読み込みました。${skipped?`（${skipped}本はすでにあるため、そのままにしました）`:''}`);renderHistory();
+  bkMsg(`${added}本の履歴を読み込みました。${skipped?`（${skipped}本はすでにあるため、そのままにしました）`:''}${missing?`（${missing}本は動画が見つからず読み込めませんでした）`:''}`);renderHistory();
+}
+async function importBackup(fileList){
+  const files=[...fileList];bkMsg('読み込み中…');
+  if(files.length===1){const head=new Uint8Array(await files[0].slice(0,4).arrayBuffer());
+    if(head[0]===0x50&&head[1]===0x4b){const z=await readZip(files[0]);if(!z['manifest.json'])throw new Error('SwingLabのバックアップではないようです。');
+      return importRecords(JSON.parse(new TextDecoder().decode(z['manifest.json'])),async n=>z[n])}}
+  // unpacked backup: manifest.json + the video files (picked together, or as a folder)
+  const man=files.find(f=>f.name==='manifest.json');
+  if(!man)throw new Error(files.length===1?'バックアップのzipファイル（swinglab-backup-….zip）を選んでください。':'選んだ中に manifest.json がありません。展開したフォルダ全体を選んでください。');
+  const byName={};files.forEach(f=>{byName[f.name]=f});
+  const m=JSON.parse(await man.text());
+  return importRecords(m,async n=>{const f=byName[(n||'').split('/').pop()];return f?new Uint8Array(await f.arrayBuffer()):null});
 }
 $('bkExport').onclick=async()=>{const b=$('bkExport');b.disabled=true;try{await exportBackup()}catch(e){console.error(e);bkMsg('書き出せませんでした：'+(e.message||''))}b.disabled=false};
-$('bkFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{await importBackup(f)}catch(err){console.error(err);bkMsg(err.message||'読み込めませんでした。')}};
+['bkFile','bkDir'].forEach(id=>$(id).onchange=async e=>{const fl=[...e.target.files];e.target.value='';if(!fl.length)return;try{await importBackup(fl)}catch(err){console.error(err);bkMsg(err.message||'読み込めませんでした。')}});
 $('histShrink').onclick=async()=>{const b=$('histShrink');b.disabled=true;
   try{const r=await shrinkOld((d,n)=>{$('shrinkMsg').textContent=`容量を減らしています… ${Math.min(n,Math.floor(d)+1)}/${n}本（${Math.round(d/n*100)}%）`});
     $('shrinkMsg').textContent=r.saved>0?`約${Math.round(r.saved/1e6)}MB減らしました。`:'減らせる履歴はありませんでした。'}catch(e){console.error(e);$('shrinkMsg').textContent='容量を減らせませんでした。'}
