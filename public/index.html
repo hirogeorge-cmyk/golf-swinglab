@@ -371,10 +371,10 @@ td.num{font-weight:600;letter-spacing:-.01em}
     <div class="sfield"><span class="slabel">動画の速さ</span><div class="seg" data-for="slow"><button data-v="1">通常</button><button data-v="4">スロー 1/4</button><button data-v="8">スロー 1/8</button></div></div>
     <div class="sfield"><span class="slabel">解析の精度</span><div class="seg" data-for="hq"><button data-v="1">高精度</button><button data-v="0">速さ優先</button></div>
       <p class="shelp">高精度：トップで肩の位置を正しく追えます（初回に約55MBを読み込み、解析にも時間がかかります）。速さ優先：これまでの方式</p></div>
-    <div class="sfield"><span class="slabel">履歴への保存</span><div class="seg" data-for="saveMode"><button data-v="lite">容量節約</button><button data-v="full">元の動画</button></div>
-      <p class="shelp">容量節約：スイングの前後だけを切り出し、画質を720p程度に下げて保存します（1本あたり数MB）。元の動画：撮影したままの動画を保存します</p></div>
+    <div class="sfield"><span class="slabel">履歴への保存</span><div class="seg" data-for="saveMode"><button data-v="lite">スイングだけ保存</button><button data-v="full">動画をまるごと保存</button></div>
+      <p class="shelp">スイングだけ保存：アドレスの少し前からフィニッシュの少し後までを切り出して保存します。画質は元の動画のまま（1本あたり数MB〜10MB程度）。動画をまるごと保存：撮影したままの動画を保存します</p></div>
     <div class="hidden-selects" aria-hidden="true">
-      <select id="saveMode" tabindex="-1"><option value="lite">容量節約</option><option value="full">元の動画</option></select>
+      <select id="saveMode" tabindex="-1"><option value="lite">スイングだけ保存</option><option value="full">動画をまるごと保存</option></select>
       <select id="hq" tabindex="-1"><option value="1">高精度</option><option value="0">速さ優先</option></select>
       <select id="hand" tabindex="-1"><option value="R">右打ち</option><option value="L">左打ち</option></select>
       <select id="view" tabindex="-1"><option value="face">正面</option><option value="dtl">後方</option></select>
@@ -1389,15 +1389,17 @@ const canvasBlob=(c,q=0.72)=>new Promise(r=>c.toBlob(r,'image/jpeg',q));
 async function urlToCanvas(u){const im=new Image();im.src=u;await im.decode();const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;c.getContext('2d').drawImage(im,0,0);return c}
 async function blobToCanvas(b){const bm=await createImageBitmap(b);const c=document.createElement('canvas');c.width=bm.width;c.height=bm.height;c.getContext('2d').drawImage(bm,0,0);bm.close&&bm.close();return c}
 function summaryOf(sw){const A=sw.A,P=A.P;return {tempo:A.tempo,back:A.back,down:A.down,sh:A.shA?A.shF[P[4]]:null,head:A.view==='face'?A.headSide[P[4]]:null,view:A.view,hand:sw.cfg.hand}}
-// Re-encode just the swing (from a little before address to after the finish) at about 720p.
+// Cut out just the swing (from a little before address to after the finish), keeping the original resolution
+// (capped at 1920px on the long side) and a high bitrate so the picture looks the same as the source.
 // src: {video, frames, A, cfg, W, H} with the video already loaded. Returns null if this browser cannot encode.
 async function compressSwing(src,prog=()=>{}){
   if(!window.VideoEncoder||!window.VideoFrame)return null;
   const F=src.frames,P=src.A.P,sl=src.cfg.slow,near=t=>nearest(t,src);
   const a=near(F[P[1]].t-0.6*sl),b=near(F[P[10]].t+0.8*sl);if(b-a<5)return null;
-  const k=Math.min(1,1280/Math.max(src.W,src.H)),W=Math.max(2,Math.round(src.W*k/2)*2),H=Math.max(2,Math.round(src.H*k/2)*2);
+  const k=Math.min(1,1920/Math.max(src.W,src.H)),W=Math.max(2,Math.round(src.W*k/2)*2),H=Math.max(2,Math.round(src.H*k/2)*2);
   const fps=Math.max(10,Math.min(120,Math.round((b-a)/((F[b].t-F[a].t)||1))));
-  let cfg=null;for(const codec of ['avc1.640028','avc1.4d0028','avc1.42002a','avc1.42001f']){const c={codec,width:W,height:H,bitrate:Math.round(4e6*(W*H)/(720*1280)),framerate:fps};
+  const br=Math.round(Math.max(8e6,Math.min(40e6,20e6*(W*H)/(1080*1920)*Math.max(0.5,fps/60))));
+  let cfg=null;for(const codec of ['avc1.64002a','avc1.640033','avc1.4d002a','avc1.42002a','avc1.640028','avc1.42001f']){const c={codec,width:W,height:H,bitrate:br,bitrateMode:'variable',latencyMode:'quality',framerate:fps};
     try{if((await VideoEncoder.isConfigSupported(c)).supported){cfg=c;break}}catch(e){}}
   if(!cfg)return null;
   const MM=await loadMuxer();const muxer=new MM.Muxer({target:new MM.ArrayBufferTarget(),video:{codec:'avc',width:W,height:H},fastStart:'in-memory'});
@@ -1428,7 +1430,8 @@ async function saveHistory(sw,file,prog=()=>{}){
     const thumbs=(sw.thumbs||[]).map(th=>({t:th.t,url:th.c.toDataURL('image/jpeg',0.7)}));
     let lite=null;
     if($('saveMode').value!=='full'){const tv=offscreenVideo();
-      try{await loadVideoFile(tv,file);lite=await compressSwing({source:'video',video:tv,frames:sw.frames,A:sw.A,cfg:sw.cfg,W:sw.W,H:sw.H},prog)}catch(e){console.warn('compress failed',e)}finally{dropVideo(tv)}}
+      try{await loadVideoFile(tv,file);lite=await compressSwing({source:'video',video:tv,frames:sw.frames,A:sw.A,cfg:sw.cfg,W:sw.W,H:sw.H},prog)}catch(e){console.warn('compress failed',e)}finally{dropVideo(tv)}
+      if(lite&&file.size&&lite.buf.byteLength>file.size*0.9)lite=null;} // not worth it: keep the original file
     const rec={id:'sw_'+Date.now().toString(36),date:ymd(d),created:Date.now(),file:file.name||'',cfg:{...sw.cfg},rtm:!!sw.rtm,hw:sw.hw,
       W:lite?lite.W:sw.W,H:lite?lite.H:sw.H,lite:!!lite,origBytes:file.size||0,
       frames:lite?lite.frames:sw.frames.map(f=>({t:f.t,p:f.p,w:f.w})),thumbs:lite?shiftThumbs(thumbs,lite.t0,lite.t1):thumbs,
@@ -1446,7 +1449,7 @@ async function shrinkOld(onProg){
     try{await loadVideoFile(tv,vb);const tmp={source:'video',video:tv,W:r.W,H:r.H,rtm:r.rtm,hw:r.hw,frames:r.frames.map(f=>({t:f.t,p:f.p.map(q=>[...q]),w:f.w}))};
       analyze(tmp,{...r.cfg});if(!tmp.A.valid){done++;continue}
       const lite=await compressSwing(tmp,p=>onProg(done+p,list.length));if(!lite){done++;continue}
-      const before=vb.size;
+      const before=vb.size;if(lite.buf.byteLength>before*0.9){done++;continue}
       Object.assign(r,{W:lite.W,H:lite.H,lite:true,frames:lite.frames,thumbs:shiftThumbs(r.thumbs||[],lite.t0,lite.t1),bytes:lite.buf.byteLength});
       await hPut(r,{buf:lite.buf,type:'video/mp4'});saved+=before-lite.buf.byteLength;
     }catch(e){console.warn('shrink failed',r.id,e)}finally{dropVideo(tv)}
