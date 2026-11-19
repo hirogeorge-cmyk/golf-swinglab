@@ -451,6 +451,7 @@ td.num{font-weight:600;letter-spacing:-.01em}
       <label><input type="checkbox" id="tPath" checked>手の軌道</label>
       <label><input type="checkbox" id="tHead" checked>頭の基準円</label>
       <label><input type="checkbox" id="tSpine" checked>アドレス時の軸</label>
+      <label><input type="checkbox" id="tPlane" checked>スイングプレーン（後方撮影）</label>
     </div>
     <p class="path-note"><span class="sw g"></span>バックスイング <span class="sw o"></span>ダウンスイングの手の通り道。正面撮影では左右・上下の動きを表します（手前・奥の動きは後方撮影で見られます）</p>
     <div class="editbar">
@@ -792,6 +793,12 @@ function renderPanel(){
     rows.map(r=>`<tr><td>${r[0]}<span class="ref">${r[3]}</span></td>${r[2].map(v=>`<td class="num">${v}<small style="font-size:12px;color:var(--muted)"> ${r[1]}</small></td>`).join('')}</tr>`).join('')+'</tbody>';
 
   const D=[];
+  if(A.view==='dtl'){const pc=planeCheck(S);
+    if(!S.plane||S.plane.guess)D.push({s:'warn',t:'アドレスのクラブを自動で見つけられませんでした',d:'スイングプレーンは仮の位置で表示しています。「マーカーを修正」を押し、P1（アドレス）の画面で金色の丸をクラブヘッドの位置まで動かすと、正しく判定します。',i:P[1]});
+    else if(pc){const how=pc.over>=0.5?'over':pc.under>=0.5?'under':'in';
+      D.push(how==='in'?{s:'good',t:'ダウンスイングの手元がVゾーン内',d:'切り返しからの手元が、シャフトプレーンと肩のラインの間を通っています。理想的な通り道です。',i:P[4]+Math.round((P[7]-P[4])/2)}
+        :how==='over'?{s:'bad',t:'手元が肩のラインより上を通っています',d:'ダウンスイングで手元が外側（上）から下りています。アウトサイドから入るカット軌道やスライスの原因になります。切り返しで右ひじを体の近くに下ろし、手元を低く通す意識を持ちましょう。',i:P[4]+Math.round((P[7]-P[4])/2)}
+        :{s:'warn',t:'手元がシャフトプレーンより下を通っています',d:'ダウンスイングで手元が内側（下）を通り、クラブが寝やすい状態です。プッシュやフックの原因になります。切り返しで手元を少しボール側に保つ意識を持ちましょう。',i:P[4]+Math.round((P[7]-P[4])/2)});}}
   if(false){const sh=A.shD[P[4]],xf=sh-A.hpD[P[4]];
     D.push({s:sh>=80?'good':sh>=65?'warn':'bad',t:`トップの肩の回転 ${f0(sh)}°（後方撮影から推定）`,d:sh>=80?'十分な肩の回転ができています。':'肩の回転が浅めです。左肩をあごの下まで入れ、背中が目標を向くまで回しましょう。',i:P[4]});
     D.push({s:xf>=30?'good':xf>=20?'warn':'bad',t:`捻転差 ${f0(xf)}°（後方撮影から推定）`,d:xf>=30?'上半身と下半身の捻転差が作れています。':'腰が回りすぎている、または肩の回転が浅い状態です。',i:P[4]});}
@@ -816,7 +823,7 @@ function renderPanel(){
   }
   const order={bad:0,warn:1,good:2};
   D.sort((a,b)=>order[a.s]-order[b.s]);
-  $('diag').innerHTML=D.map(x=>`<li><button data-i="${x.i}">${pill(x.s)}<span class="t">${x.t}</span><span class="go">P${Object.keys(P).find(k=>P[k]===x.i)} へ →</span><span class="d">${x.d}</span></button></li>`).join('');
+  $('diag').innerHTML=D.map(x=>`<li><button data-i="${x.i}">${pill(x.s)}<span class="t">${x.t}</span><span class="go">${(k=>k?`P${k} へ`:'その瞬間へ')(Object.keys(P).find(k=>P[k]===x.i))} →</span><span class="d">${x.d}</span></button></li>`).join('');
   $('diag').querySelectorAll('button').forEach(b=>b.onclick=()=>{stop();seek(+b.dataset.i)});
 
   $('phases').innerHTML=[[1,'アドレス'],[4,'トップ'],[7,'インパクト'],[10,'フィニッシュ']].map(([k,l])=>`<button class="phase" data-i="${P[k]}"><b>P${k}</b><span>${l}</span></button>`).join('');
@@ -925,13 +932,65 @@ function drawSwing(cv,sw,i,o){
     JOINTS.forEach(j=>{x.fillStyle='#FFFFFF';x.beginPath();x.arc(p[j][0],p[j][1],u*1.5,0,7);x.fill()});
     if(A.view!=='face'&&!o.mirror){const e=p[A.lead.e];x.font=`700 ${u*8}px "Inter", sans-serif`;x.textAlign='left';x.textBaseline='middle';
       const txt=f0(A.leadElbow[i])+'°';x.lineWidth=u*2.2;x.strokeStyle='rgba(0,0,0,.65)';x.strokeText(txt,e[0]+u*4,e[1]);x.fillStyle='#FFFFFF';x.fillText(txt,e[0]+u*4,e[1]);}}
+  if(o.plane&&sw.plane&&A.view==='dtl'){const B=sw.plane.ball,Hn=sw.plane.hands,p0=F[P[1]].p,Sh=mid(p0[11],p0[12]);
+    const ext=(a,b,s)=>[a[0]+(b[0]-a[0])*s,a[1]+(b[1]-a[1])*s];const s1=ext(B,Hn,3),s2=ext(B,Sh,2.2);
+    x.fillStyle='rgba(201,168,106,.10)';x.beginPath();x.moveTo(B[0],B[1]);x.lineTo(s1[0],s1[1]);x.lineTo(s2[0],s2[1]);x.closePath();x.fill();
+    x.setLineDash(sw.plane.guess?[u*4,u*3]:[]);x.lineWidth=u*1.1;x.strokeStyle='rgba(143,211,176,.95)';x.beginPath();x.moveTo(...ext(B,Hn,-0.15));x.lineTo(s1[0],s1[1]);x.stroke();
+    x.strokeStyle='rgba(227,194,122,.95)';x.beginPath();x.moveTo(...ext(B,Sh,-0.15));x.lineTo(s2[0],s2[1]);x.stroke();
+    x.setLineDash([]);x.fillStyle='#E3C27A';x.beginPath();x.arc(B[0],B[1],u*2.4,0,7);x.fill();
+    if(!o.mirror){x.font=`600 ${u*6}px "Zen Kaku Gothic New", sans-serif`;x.textBaseline='middle';x.textAlign='left';x.lineWidth=u*2;x.strokeStyle='rgba(0,0,0,.6)';
+      const lab=(t,pt,c)=>{x.strokeText(t,pt[0]+u*3,pt[1]);x.fillStyle=c;x.fillText(t,pt[0]+u*3,pt[1])};
+      lab('シャフトプレーン',ext(B,Hn,1.6),'#8FD3B0');lab('肩のライン',ext(B,Sh,1.25),'#E3C27A');}}
+  if(o.edit&&sw.plane&&A.view==='dtl'){const B=sw.plane.ball;x.lineWidth=u*0.9;x.beginPath();x.arc(B[0],B[1],u*6,0,7);x.fillStyle='rgba(227,194,122,.35)';x.fill();x.strokeStyle='#E3C27A';x.stroke()}
   if(o.edit){const ed=(sw.edits||{})[i]||{};x.lineWidth=u*0.9;
     EDIT_J.forEach(j=>{x.beginPath();x.arc(p[j][0],p[j][1],u*5,0,7);x.fillStyle=ed[j]?'rgba(84,200,255,.45)':'rgba(255,255,255,.18)';x.fill();x.strokeStyle=ed[j]?'#54C8FF':'#FFFFFF';x.stroke()});}
   if(sw.source!=='video'){x.setTransform(1,0,0,1,0,0);x.fillStyle='rgba(233,240,234,.4)';x.font=`600 ${cw/24}px "Inter", sans-serif`;x.textAlign='left';x.textBaseline='top';x.fillText('SAMPLE · 合成データ',cw*.04,ch*.03);}
 }
+/* ---------- swing plane (down-the-line) ----------
+   The shaft at address is found in the picture: from the hands, try every angle toward the ball and keep the
+   one along which a thin line stands out most from its surroundings; its far end is the clubhead. */
+async function detectPlane(sw){
+  if(!sw.A||sw.A.view!=='dtl'||sw.source!=='video')return null;
+  const i=sw.A.P[1],p=sw.frames[i].p,hands=mid(p[15],p[16]),body=dist(mid(p[27],p[28]),p[0]),tdir=sw.A.tdir;
+  await seekVid(sw,sw.frames[i].t);
+  const k=Math.min(1,960/Math.max(sw.W,sw.H)),W=Math.round(sw.W*k),H=Math.round(sw.H*k);
+  const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(sw.video,0,0,W,H);
+  const d=x.getImageData(0,0,W,H).data,g=new Float32Array(W*H);for(let j=0;j<W*H;j++)g[j]=0.299*d[j*4]+0.587*d[j*4+1]+0.114*d[j*4+2];
+  const at=(X,Y)=>{X=X|0;Y=Y|0;return X<1||Y<1||X>=W-1||Y>=H-1?NaN:(g[Y*W+X]*4+g[Y*W+X-1]+g[Y*W+X+1]+g[(Y-1)*W+X]+g[(Y+1)*W+X])/8};
+  const hx=hands[0]*k,hy=hands[1]*k,bd=body*k,off=Math.max(2,4*k);
+  const prof=(deg,s0,s1,stp)=>{const a=deg*Math.PI/180,dx=tdir*Math.cos(a),dy=Math.sin(a),nx=-dy,ny=dx,out=[];
+    for(let s=s0;s<=s1;s+=stp){const X=hx+dx*s,Y=hy+dy*s;const cc=at(X,Y),l=at(X+nx*off,Y+ny*off),r=at(X-nx*off,Y-ny*off);if(isNaN(cc)||isNaN(l)||isNaN(r))break;out.push(Math.abs(cc-(l+r)/2))}return out};
+  const med=a=>{const b=[...a].sort((u,v)=>u-v);return b[b.length>>1]||0};
+  let best={v:-1,deg:0};
+  for(let deg=15;deg<=85;deg+=0.5){const pr=prof(deg,0.12*bd,0.75*bd,bd*0.007);if(pr.length<30)continue;const v=med(pr);if(v>best.v)best={v,deg}}
+  if(best.v<3)return null; // no clear shaft
+  // clubhead: where the shaft line meets the ground (ankle height) — the shaft can fade against a bright mat
+  const a=best.deg*Math.PI/180,dx=tdir*Math.cos(a),dy=Math.sin(a);
+  const shY=mid(p[11],p[12])[1],hipY=mid(p[23],p[24])[1],ankY=Math.max(p[27][1],p[28][1]);
+  if(hands[1]<shY+0.3*(hipY-shY)||dy<0.2)return null;
+  const len=(ankY-hands[1])/dy,ball=[hands[0]+dx*len,hands[1]+dy*len];
+  return {hands,ball,deg:best.deg};
+}
+// where do the hands travel in the downswing relative to the V-zone (between the shaft plane and the ball–shoulder line)?
+function planeCheck(sw){
+  const A=sw.A,pl=sw.plane;if(!pl||pl.guess||A.view!=='dtl')return null;const F=sw.frames,P=A.P,p0=F[P[1]].p;
+  const B=pl.ball,Hn=pl.hands,Sh=mid(p0[11],p0[12]),hipY=mid(p0[23],p0[24])[1];
+  const side=(a,b,q)=>Math.sign((b[0]-a[0])*(q[1]-a[1])-(b[1]-a[1])*(q[0]-a[0]));
+  const u1=[(Sh[0]-B[0])/dist(Sh,B),(Sh[1]-B[1])/dist(Sh,B)],u2=[(Hn[0]-B[0])/dist(Hn,B),(Hn[1]-B[1])/dist(Hn,B)];
+  const M=[B[0]+(u1[0]+u2[0])/2*dist(Sh,B)*0.6,B[1]+(u1[1]+u2[1])/2*dist(Sh,B)*0.6];
+  let n=0,over=0,under=0;
+  for(let i=P[4]+1;i<P[7];i++){const h=A.hands[i];if(h[1]<Sh[1]||h[1]>hipY)continue;n++;
+    if(side(B,Sh,h)!==side(B,Sh,M))over++;else if(side(B,Hn,h)!==side(B,Hn,M))under++;}
+  if(!n)return null;return {n,over:over/n,under:under/n}
+}
+function guessPlane(sw){const A=sw.A,p=sw.frames[A.P[1]].p,hands=mid(p[15],p[16]),ank=mid(p[27],p[28]),body=dist(ank,p[0]);
+  const y=ank[1]+0.02*body,dy=y-hands[1];return {hands,ball:[hands[0]+A.tdir*Math.max(dy,0.2*body)*0.95,y],guess:true}}
+async function ensurePlane(sw){if(sw.plane||!sw.A||sw.A.view!=='dtl')return;try{sw.plane=await detectPlane(sw)}catch(e){console.warn('plane',e)}
+  if(!sw.plane)sw.plane=guessPlane(sw);
+  if(sw===S&&S.A){renderPanel();renderFrame()}}
 const EDIT_J=[0,11,12,13,14,15,16,23,24,25,26,27,28];
 let editMode=false,dragJ=null;
-const mainOpts=()=>({edit:editMode,video:false,skel:$('tSkel').checked,path:$('tPath').checked,head:$('tHead').checked,spine:$('tSpine').checked});
+const mainOpts=()=>({edit:editMode,video:false,skel:$('tSkel').checked,path:$('tPath').checked,head:$('tHead').checked,spine:$('tSpine').checked,plane:$('tPlane').checked});
 function drawOverlay(){drawSwing(ov,S,S.i,mainOpts())}
 /* ---------- filmstrip (frame thumbnails you can scrub) ---------- */
 const THUMBS=30;
@@ -995,8 +1054,8 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&openSheetEl){closeShe
   if(curView==='check'){if(!$('lb').hidden){if(e.key==='ArrowLeft')$('lbPrev').click();if(e.key==='ArrowRight')$('lbNext').click();if(e.key==='Escape')closeLB()}return}
   if(curView!=='analyze'){const P=cm;if(e.key===' '){e.preventDefault();P.playing?P.stop():P.play()}if(e.key==='ArrowLeft'){P.stop();P.go(P.i-1)}if(e.key==='ArrowRight'){P.stop();P.go(P.i+1)}return}
   if(e.key===' '){e.preventDefault();S.playing?stop():play()}if(e.key==='ArrowLeft'){stop();seek(S.i-1)}if(e.key==='ArrowRight'){stop();seek(S.i+1)}});
-['tSkel','tPath','tHead','tSpine'].forEach(id=>$(id).onchange=renderFrame);
-['hand','view','height','slow'].forEach(id=>$(id).onchange=()=>{if(!S.A)return;analyze();renderPanel();renderFrame();onMainChanged();if(S.histId)hPatch(S.histId,{cfg:{...S.cfg},summary:summaryOf(S)}).catch(()=>{})});
+['tSkel','tPath','tHead','tSpine','tPlane'].forEach(id=>$(id).onchange=renderFrame);
+['hand','view','height','slow'].forEach(id=>$(id).onchange=()=>{if(!S.A)return;analyze();renderPanel();renderFrame();onMainChanged();ensurePlane(S);if(S.histId)hPatch(S.histId,{cfg:{...S.cfg},summary:summaryOf(S)}).catch(()=>{})});
 window.addEventListener('resize',()=>{if(!S.A)return;layoutStage();renderFrame()});
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>drawCharts());
 new MutationObserver(()=>drawCharts()).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
@@ -1081,7 +1140,7 @@ async function rtmInfer(R,src,bx){
   return kp;
 }
 let lmTs=0;
-async function detectVideo(file,v,prog,alive,cfg=mainCfg()){
+async function detectVideo(file,v,prog,alive,cfg=mainCfg(),noTrim=false){
   let lm=await getLandmarker(prog);
   let rtm=null;if($('hq').value==='1'){try{rtm=await getRTM(prog)}catch(e){console.warn('RTMPose unavailable, using MediaPipe only',e)}}
   prog('動画を読み込み中…',0.2);
@@ -1100,7 +1159,7 @@ async function detectVideo(file,v,prog,alive,cfg=mainCfg()){
   // Pass 1 (quick, 10 frames/s, light engine only): find where the swing is, so the time spent
   // waiting before address or watching the ball after the finish is left out of the detailed pass.
   let tA=0,tB=dur;
-  if(dur>4.5){
+  if(dur>4.5&&!noTrim){
     const cf=[],cn=Math.floor(dur*10);
     for(let k=0;k<=cn;k++){
       if(!alive())return null;
@@ -1138,11 +1197,16 @@ async function analyzeFile(file){
   const my=++runId;stop();
   try{
     S.A=null;setMainUI('processing');location.hash==='#analyze'||!location.hash?null:(location.hash='#analyze');
-    const r=await detectVideo(file,video,(t,p)=>busy(t,p),()=>my===runId);
+    let r=await detectVideo(file,video,(t,p)=>busy(t,p),()=>my===runId);
     if(!r)return;
+    if(r.trimmed){ // check the cut-out part really holds a swing; otherwise analyse the whole video
+      const tmp={frames:r.frames.map(f=>({...f,p:f.p&&f.p.map(q=>[...q])}))};
+      let ok=false;try{tmp.frames=prepare(tmp.frames,tmp);analyze(tmp,mainCfg());ok=tmp.A.valid}catch(e){}
+      if(!ok){r=await detectVideo(file,video,(t,p)=>busy(t,p),()=>my===runId,mainCfg(),true);if(!r)return}}
     S.thumbs=r.thumbs;S.rtm=r.rtm;S.W=r.W;S.H=r.H;S.source='video';S.video=video;S.name=file.name;layoutStage();
     S.edits={};S.orig={};S.lockP=null;S.histId=null;S.label='';if(editMode)setEdit(false);
-    S.frames=prepare(r.frames,S);S.i=0;analyze();const vmsg=S.A.valid?autoView(S,'view',mainCfg):'';
+    S.plane=null;S.histScale=null;S.frames=prepare(r.frames,S);S.i=0;analyze();const vmsg=S.A.valid?autoView(S,'view',mainCfg):'';
+    if(S.A.valid&&S.A.view==='dtl'){busy('スイングプレーンを計算中…',0.98);await ensurePlane(S)}
     if(!S.A.valid)throw new Error('スイングの区間を特定できませんでした。アドレスからフィニッシュまで映っているか確認してください。');
     setMainUI('done');layoutStage();renderPanel();seek(S.A.P[1]);busy(null);onMainChanged();
     $('notice').querySelector('strong').textContent='解析完了';
@@ -1160,13 +1224,15 @@ function setEdit(on){editMode=on;if(on)stop();$('editBtn').setAttribute('aria-pr
   $('editHint').hidden=!on;$('editReset').hidden=!on;ov.classList.toggle('editing',on);drawOverlay();}
 $('editBtn').onclick=()=>setEdit(!editMode);
 const ovPt=ev=>{const r=ov.getBoundingClientRect();return [(ev.clientX-r.left)/r.width*S.W,(ev.clientY-r.top)/r.height*S.H]};
+let dragBall=false;
 ov.addEventListener('pointerdown',ev=>{if(!editMode||!S.A)return;const q=ovPt(ev),p=S.frames[S.i].p;let best=-1,bd=1e9;
+  if(S.plane&&S.A.view==='dtl'&&dist(q,S.plane.ball)<Math.max(S.W,S.H)/20){dragBall=true;ov.setPointerCapture(ev.pointerId);ev.preventDefault();return}
   EDIT_J.forEach(j=>{const d=dist(q,p[j]);if(d<bd){bd=d;best=j}});
   if(bd<Math.max(S.W,S.H)/14){dragJ=best;ov.setPointerCapture(ev.pointerId);ev.preventDefault();
     S.orig=S.orig||{};S.orig[S.i]=S.orig[S.i]||S.frames[S.i].p.map(v=>[...v]);}});
-ov.addEventListener('pointermove',ev=>{if(dragJ==null)return;const q=ovPt(ev);S.frames[S.i].p[dragJ]=[q[0],q[1],1];
+ov.addEventListener('pointermove',ev=>{if(dragBall){S.plane.ball=ovPt(ev);drawOverlay();return}if(dragJ==null)return;const q=ovPt(ev);S.frames[S.i].p[dragJ]=[q[0],q[1],1];
   S.edits=S.edits||{};(S.edits[S.i]=S.edits[S.i]||{})[dragJ]=true;drawOverlay();});
-const endDrag=()=>{if(dragJ==null)return;dragJ=null;relock();};
+const endDrag=()=>{if(dragBall){dragBall=false;S.plane.manual=true;S.plane.guess=false;renderPanel();if(S.histId)hPatch(S.histId,{plane:planeForSave(S)}).catch(()=>{});return}if(dragJ==null)return;dragJ=null;relock();};
 ov.addEventListener('pointerup',endDrag);ov.addEventListener('pointercancel',endDrag);
 function relock(){const A=S.A;S.lockP=S.lockP||{adr:A.P[1],top:A.P[4],imp:A.P[7],fin:A.P[10],topHi:A.topHi};const i=S.i;analyze();renderPanel();S.i=i;renderFrame();onMainChanged();}
 $('editReset').onclick=()=>{if(S.orig&&S.orig[S.i]){S.frames[S.i].p=S.orig[S.i];delete S.orig[S.i];if(S.edits)delete S.edits[S.i];relock();}};
@@ -1212,7 +1278,7 @@ function makePlayer(pfx,render){
   bindStrip(el('Strip'),()=>{const [lo,hi]=P.range();return [S.frames[lo].t,S.frames[hi].t]},t=>{if(!S.A)return;P.stop();P.go(nearest(t))});
   return P;
 }
-const lineOpts=on=>{const b=mainOpts();return on?{skel:true,path:true,head:b.head,spine:b.spine}:{}};
+const lineOpts=on=>{const b=mainOpts();return on?{skel:true,path:true,head:b.head,spine:b.spine,plane:b.plane}:{}};
 // ---- frame grid (コマ送り) ----
 let gridJob=0,gridIdx=[],lbI=0;const gtmp=document.createElement('canvas');
 const ck={i:0,playing:false,stop(){},play(){},phases(){},draw(){renderGrid()},go(i){ck.i=i;renderGrid()}};
@@ -1298,7 +1364,7 @@ function renderCmp(){
 let mRun=0;
 $('mFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!isVideoFile(file))return;const my=++mRun;cm.stop();
   try{const r=await detectVideo(file,M.video,(t,p)=>busy(t,p,'busyM'),()=>my===mRun,mCfg());if(!r)return;
-    M.label='';M.histId=null;M.thumbs=r.thumbs;M.rtm=r.rtm;M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());if(M.A.valid)autoView(M,'mView',mCfg);
+    M.label='';M.histId=null;M.thumbs=r.thumbs;M.rtm=r.rtm;M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());if(M.A.valid)autoView(M,'mView',mCfg);M.plane=null;if(M.A.valid&&M.A.view==='dtl')await ensurePlane(M);
     if(!M.A.valid)throw new Error('お手本動画のスイング区間を特定できませんでした。アドレスからフィニッシュまで映っている動画を選んでください。');
     busy(null,0,'busyM');
     $('cmNote').innerHTML=`お手本：<b>${M.name.replace(/[<>&]/g,'')}</b>　自分：<b id="cmName"></b>　人物の大きさと立ち位置をそろえ、始動の瞬間をそろえて実際の速さで再生します。`;
@@ -1435,6 +1501,8 @@ function offscreenVideo(){const v=document.createElement('video');v.muted=true;v
   v.style.cssText='position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none';document.body.appendChild(v);return v}
 function dropVideo(v){try{if(v.src)URL.revokeObjectURL(v.src);v.removeAttribute('src');v.load();v.remove()}catch(e){}}
 const shiftThumbs=(th,t0,t1)=>th.filter(q=>q.t>=t0-0.05&&q.t<=t1+0.05).map(q=>({...q,t:Math.max(0,q.t-t0)}));
+function planeForSave(sw,sc){const pl=sw.plane;if(!pl)return null;const f=q=>sc?[q[0]*sc.x,q[1]*sc.y]:[q[0],q[1]];
+  if(!sc&&sw.histScale)return planeForSave(sw,sw.histScale);return {ball:f(pl.ball),hands:f(pl.hands),deg:pl.deg,manual:!!pl.manual,guess:!!pl.guess}}
 async function saveHistory(sw,file,prog=()=>{}){
   try{
     try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
@@ -1450,9 +1518,9 @@ async function saveHistory(sw,file,prog=()=>{}){
     const rec={id:'sw_'+Date.now().toString(36),date:ymd(d),created:Date.now(),file:file.name||'',cfg:{...sw.cfg},rtm:!!sw.rtm,hw:sw.hw,
       W:lite?lite.W:sw.W,H:lite?lite.H:sw.H,lite:!!lite,origBytes:file.size||0,
       frames:lite?lite.frames:sw.frames.map(f=>({t:f.t,p:f.p,w:f.w})),thumbs:lite?shiftThumbs(thumbs,lite.t0,lite.t1):thumbs,
-      posterUrl:sm.toDataURL('image/jpeg',0.8),summary:summaryOf(sw),memo:''};
+      posterUrl:sm.toDataURL('image/jpeg',0.8),summary:summaryOf(sw),memo:'',plane:planeForSave(sw,lite?{x:lite.W/sw.W,y:lite.H/sw.H}:null)};
     const vid=lite?{buf:lite.buf,type:'video/mp4'}:{buf:await file.arrayBuffer(),type:file.type||'video/mp4'};
-    if(!vid.buf.byteLength)throw new Error('empty video');rec.bytes=vid.buf.byteLength;
+    if(!vid.buf.byteLength)throw new Error('empty video');rec.bytes=vid.buf.byteLength;sw.histScale=lite?{x:lite.W/sw.W,y:lite.H/sw.H}:null;
     await hPut(rec,vid);sw.histId=rec.id;sw.label=fmtDate(rec.date).main;return rec;
   }catch(e){console.warn('history save failed',e);return null}
 }
@@ -1476,7 +1544,7 @@ async function loadRecord(sw,rec,videoEl,ids,cfgFn){
   if(!vb||!vb.size)throw new Error('この履歴の動画を読み込めませんでした。お手数ですが、動画をもう一度解析してください。');
   await loadVideoFile(videoEl,vb);
   Object.entries(ids).forEach(([k,id])=>{$(id).value=String(rec.cfg[k])});
-  Object.assign(sw,{video:videoEl,source:'video',W:rec.W,H:rec.H,rtm:rec.rtm,hw:rec.hw,name:fmtDate(rec.date).main,label:fmtDate(rec.date).main,histId:rec.id,edits:{},orig:{},lockP:null,i:0,
+  Object.assign(sw,{plane:rec.plane?{...rec.plane}:null,histScale:null,video:videoEl,source:'video',W:rec.W,H:rec.H,rtm:rec.rtm,hw:rec.hw,name:fmtDate(rec.date).main,label:fmtDate(rec.date).main,histId:rec.id,edits:{},orig:{},lockP:null,i:0,
     frames:rec.frames.map(f=>({t:f.t,p:f.p.map(q=>[...q]),w:f.w}))});
   sw.thumbs=(await Promise.all((rec.thumbs||[]).map(async th=>{try{return {t:th.t,c:th.url?await urlToCanvas(th.url):await blobToCanvas(th.blob)}}catch(e){return null}}))).filter(Boolean);
   analyze(sw,cfgFn());
