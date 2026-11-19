@@ -145,7 +145,7 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .hist-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:16px}
 .hist-head h2{margin:0}
 .hist-usage{font-size:12px;color:var(--muted)}
-.hist-actions{margin-bottom:12px}
+.hist-actions{margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .hist-warn{margin:0 0 12px}
 .hist-warn a{color:var(--accent)}
 .hist-list{display:flex;flex-direction:column;gap:8px}
@@ -371,7 +371,10 @@ td.num{font-weight:600;letter-spacing:-.01em}
     <div class="sfield"><span class="slabel">動画の速さ</span><div class="seg" data-for="slow"><button data-v="1">通常</button><button data-v="4">スロー 1/4</button><button data-v="8">スロー 1/8</button></div></div>
     <div class="sfield"><span class="slabel">解析の精度</span><div class="seg" data-for="hq"><button data-v="1">高精度</button><button data-v="0">速さ優先</button></div>
       <p class="shelp">高精度：トップで肩の位置を正しく追えます（初回に約55MBを読み込み、解析にも時間がかかります）。速さ優先：これまでの方式</p></div>
+    <div class="sfield"><span class="slabel">履歴への保存</span><div class="seg" data-for="saveMode"><button data-v="lite">容量節約</button><button data-v="full">元の動画</button></div>
+      <p class="shelp">容量節約：スイングの前後だけを切り出し、画質を720p程度に下げて保存します（1本あたり数MB）。元の動画：撮影したままの動画を保存します</p></div>
     <div class="hidden-selects" aria-hidden="true">
+      <select id="saveMode" tabindex="-1"><option value="lite">容量節約</option><option value="full">元の動画</option></select>
       <select id="hq" tabindex="-1"><option value="1">高精度</option><option value="0">速さ優先</option></select>
       <select id="hand" tabindex="-1"><option value="R">右打ち</option><option value="L">左打ち</option></select>
       <select id="view" tabindex="-1"><option value="face">正面</option><option value="dtl">後方</option></select>
@@ -499,7 +502,7 @@ td.num{font-weight:600;letter-spacing:-.01em}
   <div class="hist-head"><h2>スイングの履歴</h2><span class="hist-usage" id="histUsage"></span></div>
   <p class="intro">解析した動画は、日付と一緒にこの端末の中だけに保存されます（外部には送信されません）。2本を選ぶと、並べて比較できます。</p>
   <div class="notice hist-warn" id="histWarn" hidden><strong>ご注意</strong><span>この画面（Claudeアプリなどの中）では、アプリを閉じると履歴が消えることがあります。履歴を残すには、公開サイト <a href="https://hirogeorge-cmyk.github.io/golf-swinglab/" target="_blank" rel="noopener">hirogeorge-cmyk.github.io/golf-swinglab</a> をSafariで開き、「ホーム画面に追加」してお使いください。</span></div>
-  <div class="hist-actions"><button class="btn primary" id="histCmpBtn">2本を選んで比較する</button></div>
+  <div class="hist-actions"><button class="btn primary" id="histCmpBtn">2本を選んで比較する</button><button class="btn" id="histShrink" hidden>古い履歴の容量を減らす</button><span class="export-msg" id="shrinkMsg" role="status"></span></div>
   <div class="empty" id="histEmpty" hidden><p>まだ履歴がありません。「解析」タブで動画を選ぶと、ここに自動で保存されます。</p><a class="btn primary" href="#analyze">動画を選ぶ</a></div>
   <div class="hist-list" id="histList"></div>
   <div class="cmpbar" id="cmpBar" hidden><span id="cmpCount">比べる2本をタップして選んでください（0/2）</span><div class="cmpbar-btns"><button class="btn" id="cmpCancel">やめる</button><button class="btn primary" id="cmpGo" disabled>この2本を比べる</button></div></div>
@@ -1128,8 +1131,10 @@ async function analyzeFile(file){
     if(!S.A.valid)throw new Error('スイングの区間を特定できませんでした。アドレスからフィニッシュまで映っているか確認してください。');
     setMainUI('done');layoutStage();renderPanel();seek(S.A.P[1]);busy(null);onMainChanged();
     $('notice').querySelector('strong').textContent='解析完了';
-    saveHistory(S,file).then(rec=>{if(rec&&my===runId){$('noticeText').textContent+=` ${fmtDate(rec.date).main} の履歴に保存しました。`;setCmpLabels()}});
     $('noticeText').textContent=`${file.name}（${r.dur.toFixed(1)} 秒${r.full>15?'・先頭15秒のみ':''}）を解析しました。${vmsg}数値は2D映像からの推定値です。撮影方向と利き手が正しいか確認してください。`;
+    {const base=$('noticeText').textContent;
+     saveHistory(S,file,p=>{if(my===runId)$('noticeText').textContent=base+` 履歴に保存中… ${Math.round(p*100)}%`}).then(rec=>{if(my!==runId)return;
+       $('noticeText').textContent=base+(rec?` ${fmtDate(rec.date).main} の履歴に保存しました${rec.lite?`（約${Math.max(0.1,rec.bytes/1e6).toFixed(1)}MB${rec.origBytes?`・元の動画は約${Math.round(rec.origBytes/1e6)}MB`:''}）`:''}。`:' 履歴に保存できませんでした。');setCmpLabels()})}
   }catch(e){
     console.error(e);busy(`<span class="err">${e.message||'解析に失敗しました。'}</span><br><button class="btn" id="closeErr" style="margin-top:8px">閉じる</button>`,0);
     $('closeErr').onclick=()=>{busy(null);resetMain()};
@@ -1384,18 +1389,69 @@ const canvasBlob=(c,q=0.72)=>new Promise(r=>c.toBlob(r,'image/jpeg',q));
 async function urlToCanvas(u){const im=new Image();im.src=u;await im.decode();const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;c.getContext('2d').drawImage(im,0,0);return c}
 async function blobToCanvas(b){const bm=await createImageBitmap(b);const c=document.createElement('canvas');c.width=bm.width;c.height=bm.height;c.getContext('2d').drawImage(bm,0,0);bm.close&&bm.close();return c}
 function summaryOf(sw){const A=sw.A,P=A.P;return {tempo:A.tempo,back:A.back,down:A.down,sh:A.shA?A.shF[P[4]]:null,head:A.view==='face'?A.headSide[P[4]]:null,view:A.view,hand:sw.cfg.hand}}
-async function saveHistory(sw,file){
+// Re-encode just the swing (from a little before address to after the finish) at about 720p.
+// src: {video, frames, A, cfg, W, H} with the video already loaded. Returns null if this browser cannot encode.
+async function compressSwing(src,prog=()=>{}){
+  if(!window.VideoEncoder||!window.VideoFrame)return null;
+  const F=src.frames,P=src.A.P,sl=src.cfg.slow,near=t=>nearest(t,src);
+  const a=near(F[P[1]].t-0.6*sl),b=near(F[P[10]].t+0.8*sl);if(b-a<5)return null;
+  const k=Math.min(1,1280/Math.max(src.W,src.H)),W=Math.max(2,Math.round(src.W*k/2)*2),H=Math.max(2,Math.round(src.H*k/2)*2);
+  const fps=Math.max(10,Math.min(120,Math.round((b-a)/((F[b].t-F[a].t)||1))));
+  let cfg=null;for(const codec of ['avc1.640028','avc1.4d0028','avc1.42002a','avc1.42001f']){const c={codec,width:W,height:H,bitrate:Math.round(4e6*(W*H)/(720*1280)),framerate:fps};
+    try{if((await VideoEncoder.isConfigSupported(c)).supported){cfg=c;break}}catch(e){}}
+  if(!cfg)return null;
+  const MM=await loadMuxer();const muxer=new MM.Muxer({target:new MM.ArrayBufferTarget(),video:{codec:'avc',width:W,height:H},fastStart:'in-memory'});
+  let err=null;const enc=new VideoEncoder({output:(c,m)=>muxer.addVideoChunk(c,m),error:e=>{err=e}});enc.configure(cfg);
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');const t0=F[a].t;
+  for(let i=a;i<=b;i++){
+    await seekVid(src,F[i].t);x.drawImage(src.video,0,0,W,H);
+    const dur=i<b?F[i+1].t-F[i].t:1/fps;
+    const vf=new VideoFrame(cv,{timestamp:Math.round((F[i].t-t0)/sl*sl*1e6),duration:Math.max(1,Math.round(dur*1e6))});
+    enc.encode(vf,{keyFrame:(i-a)%fps===0});vf.close();
+    while(enc.encodeQueueSize>4)await sleep(4);if(err)throw err;prog((i-a+1)/(b-a+1));
+  }
+  await enc.flush();muxer.finalize();const sx=W/src.W,sy=H/src.H;
+  return {buf:muxer.target.buffer,W,H,t0,t1:F[b].t,
+    frames:F.slice(a,b+1).map(f=>({t:f.t-t0,p:f.p.map(q=>[q[0]*sx,q[1]*sy,q[2]]),w:f.w}))};
+}
+function offscreenVideo(){const v=document.createElement('video');v.muted=true;v.playsInline=true;v.preload='auto';v.setAttribute('playsinline','');
+  v.style.cssText='position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none';document.body.appendChild(v);return v}
+function dropVideo(v){try{if(v.src)URL.revokeObjectURL(v.src);v.removeAttribute('src');v.load();v.remove()}catch(e){}}
+const shiftThumbs=(th,t0,t1)=>th.filter(q=>q.t>=t0-0.05&&q.t<=t1+0.05).map(q=>({...q,t:Math.max(0,q.t-t0)}));
+async function saveHistory(sw,file,prog=()=>{}){
   try{
     try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
     let d=new Date(file.lastModified||Date.now());if(!(d.getTime()>0)||d.getTime()>Date.now()+864e5)d=new Date();
     await seekVid(sw,sw.frames[sw.A.P[4]].t);const pc=document.createElement('canvas');drawSwing(pc,sw,sw.A.P[4],{video:true,fit:true});
     const sm=document.createElement('canvas');sm.width=180;sm.height=240;sm.getContext('2d').drawImage(pc,0,0,180,240);
-    const rec={id:'sw_'+Date.now().toString(36),date:ymd(d),created:Date.now(),file:file.name||'',cfg:{...sw.cfg},W:sw.W,H:sw.H,rtm:!!sw.rtm,hw:sw.hw,
-      frames:sw.frames.map(f=>({t:f.t,p:f.p,w:f.w})),thumbs:(sw.thumbs||[]).map(th=>({t:th.t,url:th.c.toDataURL('image/jpeg',0.7)})),
+    await seekVid(sw,sw.frames[sw.i||0].t);if(sw===S&&curView==='analyze')renderFrame();
+    const thumbs=(sw.thumbs||[]).map(th=>({t:th.t,url:th.c.toDataURL('image/jpeg',0.7)}));
+    let lite=null;
+    if($('saveMode').value!=='full'){const tv=offscreenVideo();
+      try{await loadVideoFile(tv,file);lite=await compressSwing({source:'video',video:tv,frames:sw.frames,A:sw.A,cfg:sw.cfg,W:sw.W,H:sw.H},prog)}catch(e){console.warn('compress failed',e)}finally{dropVideo(tv)}}
+    const rec={id:'sw_'+Date.now().toString(36),date:ymd(d),created:Date.now(),file:file.name||'',cfg:{...sw.cfg},rtm:!!sw.rtm,hw:sw.hw,
+      W:lite?lite.W:sw.W,H:lite?lite.H:sw.H,lite:!!lite,origBytes:file.size||0,
+      frames:lite?lite.frames:sw.frames.map(f=>({t:f.t,p:f.p,w:f.w})),thumbs:lite?shiftThumbs(thumbs,lite.t0,lite.t1):thumbs,
       posterUrl:sm.toDataURL('image/jpeg',0.8),summary:summaryOf(sw),memo:''};
-    const buf=await file.arrayBuffer();if(!buf.byteLength)throw new Error('empty video');
-    await hPut(rec,{buf,type:file.type||'video/mp4'});await seekVid(sw,sw.frames[sw.i||0].t);if(sw===S&&curView==='analyze')renderFrame();sw.histId=rec.id;sw.label=fmtDate(rec.date).main;return rec;
+    const vid=lite?{buf:lite.buf,type:'video/mp4'}:{buf:await file.arrayBuffer(),type:file.type||'video/mp4'};
+    if(!vid.buf.byteLength)throw new Error('empty video');rec.bytes=vid.buf.byteLength;
+    await hPut(rec,vid);sw.histId=rec.id;sw.label=fmtDate(rec.date).main;return rec;
   }catch(e){console.warn('history save failed',e);return null}
+}
+// shrink entries that were saved with the original video
+async function shrinkOld(onProg){
+  const list=(await hAll()).filter(r=>!r.lite);let done=0,saved=0;
+  for(const r of list){const v=await hVideo(r.id);const vb=v&&(v.buf?new Blob([v.buf],{type:v.type||'video/mp4'}):v.blob);if(!vb||!vb.size){done++;continue}
+    const tv=offscreenVideo();
+    try{await loadVideoFile(tv,vb);const tmp={source:'video',video:tv,W:r.W,H:r.H,rtm:r.rtm,hw:r.hw,frames:r.frames.map(f=>({t:f.t,p:f.p.map(q=>[...q]),w:f.w}))};
+      analyze(tmp,{...r.cfg});if(!tmp.A.valid){done++;continue}
+      const lite=await compressSwing(tmp,p=>onProg(done+p,list.length));if(!lite){done++;continue}
+      const before=vb.size;
+      Object.assign(r,{W:lite.W,H:lite.H,lite:true,frames:lite.frames,thumbs:shiftThumbs(r.thumbs||[],lite.t0,lite.t1),bytes:lite.buf.byteLength});
+      await hPut(r,{buf:lite.buf,type:'video/mp4'});saved+=before-lite.buf.byteLength;
+    }catch(e){console.warn('shrink failed',r.id,e)}finally{dropVideo(tv)}
+    done++;onProg(done,list.length)}
+  return {count:list.length,saved};
 }
 async function loadRecord(sw,rec,videoEl,ids,cfgFn){
   const v=await hVideo(rec.id);const vb=v&&(v.buf?new Blob([v.buf],{type:v.type||'video/mp4'}):v.blob);
@@ -1429,7 +1485,7 @@ async function renderHistory(){
   posterUrls.forEach(u=>URL.revokeObjectURL(u));posterUrls=[];
   if(list==null){$('histList').innerHTML='<p class="intro">この画面では履歴を保存できません（ブラウザの設定で保存が無効になっている可能性があります）。</p>';$('histEmpty').hidden=true;return}
   list.sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.created);
-  $('histEmpty').hidden=list.length>0;$('histCmpBtn').hidden=list.length<2;
+  $('histEmpty').hidden=list.length>0;$('histCmpBtn').hidden=list.length<2;$('histShrink').hidden=!list.some(r=>!r.lite)||!window.VideoEncoder;
   $('histList').classList.toggle('selecting',!!histSel);
   for(const r of list){if(!r.posterUrl){r.posterUrl=await makePosterUrl(r);if(r.posterUrl)hPatch(r.id,{posterUrl:r.posterUrl}).catch(()=>{})}}
   $('histList').innerHTML=list.map(r=>{const u=r.posterUrl||'';const f=fmtDate(r.date),sm=r.summary||{};
@@ -1449,6 +1505,10 @@ async function renderHistory(){
 const alertMsg=t=>{$('cmpCount').textContent=t};
 function toast(t){let el=$('toast');if(!el){el=document.createElement('div');el.id='toast';el.className='toast';el.setAttribute('role','status');document.body.appendChild(el)}el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>{el.hidden=true},5000)}
 function updCmpBar(){$('cmpBar').hidden=!histSel;if(!histSel)return;$('cmpCount').textContent=`比べる2本をタップして選んでください（${histSel.length}/2）`;$('cmpGo').disabled=histSel.length!==2}
+$('histShrink').onclick=async()=>{const b=$('histShrink');b.disabled=true;
+  try{const r=await shrinkOld((d,n)=>{$('shrinkMsg').textContent=`容量を減らしています… ${Math.min(n,Math.floor(d)+1)}/${n}本（${Math.round(d/n*100)}%）`});
+    $('shrinkMsg').textContent=r.saved>0?`約${Math.round(r.saved/1e6)}MB減らしました。`:'減らせる履歴はありませんでした。'}catch(e){console.error(e);$('shrinkMsg').textContent='容量を減らせませんでした。'}
+  b.disabled=false;renderHistory()};
 $('histCmpBtn').onclick=()=>{histSel=[];updCmpBar();renderHistory()};
 $('cmFromHist').onclick=()=>{histSel=[];setTimeout(()=>{updCmpBar();renderHistory()},0)};
 $('cmpCancel').onclick=()=>{histSel=null;updCmpBar();renderHistory()};
@@ -1494,8 +1554,8 @@ addEventListener('hashchange',()=>showView(location.hash.slice(1)));
 const SAMPLE_ME={turn:74,hip:44,headDx:-50,headSink:24}, SAMPLE_PRO={turn:98,hip:44,headDx:-10,headSink:3};
 function loadSample(){const s=makeSample(SAMPLE_ME);S.frames=prepare(s.frames,S);S.W=s.W;S.H=s.H;S.source='sample';S.name='サンプル';video.removeAttribute('src');video.load();
   layoutStage();analyze();renderPanel();S.i=S.A.P[4];renderFrame();onMainChanged();}
-try{const sv=JSON.parse(localStorage.getItem('swinglab-settings')||'{}');['hand','view','height','slow','hq'].forEach(k=>{if(sv[k]!=null)$(k).value=sv[k]})}catch(e){}
-['hand','view','height','slow','hq'].forEach(k=>$(k).addEventListener('change',()=>{try{localStorage.setItem('swinglab-settings',JSON.stringify(Object.fromEntries(['hand','view','height','slow','hq'].map(x=>[x,$(x).value]))))}catch(e){}}));
+try{const sv=JSON.parse(localStorage.getItem('swinglab-settings')||'{}');['hand','view','height','slow','hq','saveMode'].forEach(k=>{if(sv[k]!=null)$(k).value=sv[k]})}catch(e){}
+['hand','view','height','slow','hq','saveMode'].forEach(k=>$(k).addEventListener('change',()=>{try{localStorage.setItem('swinglab-settings',JSON.stringify(Object.fromEntries(['hand','view','height','slow','hq','saveMode'].map(x=>[x,$(x).value]))))}catch(e){}}));
 /* ---------- settings sheets ---------- */
 let openSheetEl=null;
 function syncSeg(){document.querySelectorAll('.seg').forEach(g=>{const v=$(g.dataset.for).value;g.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===v)))})}
