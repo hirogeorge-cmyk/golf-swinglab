@@ -134,6 +134,14 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .hist-usage{font-size:12px;color:var(--muted)}
 .hist-actions{margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .hist-warn{margin:0 0 12px}
+.trend{margin:4px 0 18px}
+.trend-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;margin-bottom:8px}
+.trend-head h2{margin:0}
+.trend-chart{padding:10px 10px 6px}
+.trend-head .seg button{white-space:nowrap;padding:0 12px}
+@media (max-width:760px){.trend-head .seg{flex:1 1 100%}}
+.trend-chart canvas{height:190px;cursor:pointer}
+.trend-note{margin:6px 2px 0;font-size:12px;color:var(--muted)}
 .backup{margin-top:28px;padding-top:18px;border-top:1px solid var(--line)}
 .backup .intro{margin-top:4px}
 @media (pointer:coarse){.bk-dir{display:none}}
@@ -491,6 +499,13 @@ td.num{font-weight:600;letter-spacing:-.01em}
   <div class="notice hist-warn" id="histWarn" hidden><strong>ご注意</strong><span>この画面（Claudeアプリなどの中）では、アプリを閉じると履歴が消えることがあります。履歴を残すには、公開サイト <a href="https://hirogeorge-cmyk.github.io/golf-swinglab/" target="_blank" rel="noopener">hirogeorge-cmyk.github.io/golf-swinglab</a> をSafariで開き、「ホーム画面に追加」してお使いください。</span></div>
   <div class="hist-actions"><button class="btn primary" id="histCmpBtn">2本を選んで比較する</button><button class="btn" id="histShrink" hidden>古い履歴の容量を減らす</button><span class="export-msg" id="shrinkMsg" role="status"></span></div>
   <div class="empty" id="histEmpty" hidden><p>まだ履歴がありません。「解析」タブで動画を選ぶと、ここに自動で保存されます。</p><a class="btn primary" href="#analyze">動画を選ぶ</a></div>
+  <section class="trend" id="trend" hidden aria-labelledby="trTitle">
+    <div class="trend-head"><h2 id="trTitle">上達の推移</h2>
+      <div class="seg seg-sm" data-for="trMetric"><button data-v="tempo">テンポ</button><button data-v="down">ダウン</button><button data-v="sh">肩回転</button><button data-v="head">頭移動</button></div>
+      <select id="trMetric" hidden><option value="tempo" selected>tempo</option><option value="down">down</option><option value="sh">sh</option><option value="head">head</option></select></div>
+    <div class="chart trend-chart"><canvas id="trCv"></canvas><div class="tip" hidden></div></div>
+    <p class="trend-note" id="trNote"></p>
+  </section>
   <div class="hist-list" id="histList"></div>
   <section class="backup" aria-labelledby="bkTitle">
     <h2 id="bkTitle">バックアップ</h2>
@@ -1495,6 +1510,44 @@ async function makePosterUrl(r){
     const bm=typeof src==='string'?await urlToCanvas(src):await createImageBitmap(src);const c=document.createElement('canvas');c.width=180;c.height=240;const x=c.getContext('2d');
     const k=Math.max(180/bm.width,240/bm.height),w=bm.width*k,h=bm.height*k;x.fillStyle='#060907';x.fillRect(0,0,180,240);x.drawImage(bm,(180-w)/2,(240-h)/2,w,h);bm.close&&bm.close();
     return c.toDataURL('image/jpeg',0.8)}catch(e){console.warn('poster',e);return ''}}
+/* ---------- progress over time (history trend) ---------- */
+const TR={
+  tempo:{label:'テンポ',unit:' : 1',d:1,band:[2.6,3.6],note:'目安 3 : 1（帯の範囲が目安）。バックスイングとダウンスイングの時間の比です。'},
+  down:{label:'ダウンスイング',unit:' s',d:2,band:[0.22,0.35],note:'トップからインパクトまでの時間。帯の範囲（0.22〜0.35秒）が目安です。'},
+  sh:{label:'トップの肩の回転',unit:'°',d:0,band:[85,110],note:'正面から高精度モードで撮った履歴だけを表示します。帯の範囲（85〜110°）が目安です。'},
+  head:{label:'トップでの頭の横移動',unit:' cm',d:1,band:[0,8],note:'正面から撮った履歴だけを表示します。小さいほど軸が安定しています（帯は8cmまで）。'}};
+let trPts=[];
+function drawTrend(list){
+  const key=$('trMetric').value,M=TR[key];if(!list)list=drawTrend.list||[];drawTrend.list=list;
+  trPts=list.filter(r=>r.summary&&Number.isFinite(r.summary[key])).map(r=>({r,v:r.summary[key],t:new Date(r.date+'T12:00:00').getTime()})).sort((a,b)=>a.t-b.t||a.r.created-b.r.created);
+  $('trNote').textContent=trPts.length<2?`${M.label}が記録された履歴が2本以上たまると、推移が表示されます。${M.note}`:M.note;
+  const cv=$('trCv'),dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;if(!w)return;cv.width=w*dpr;cv.height=h*dpr;
+  const x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,w,h);
+  const muted=cssVar('--muted'),line=cssVar('--line'),ink=cssVar('--ink'),c1=cssVar('--c1'),surf=cssVar('--surface'),good=cssVar('--good');
+  if(!trPts.length){x.fillStyle=muted;x.font='13px "Zen Kaku Gothic New", sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('まだデータがありません',w/2,h/2);return}
+  let mn=Math.min(...trPts.map(p=>p.v),M.band[0]),mx=Math.max(...trPts.map(p=>p.v),M.band[1]);const tk=niceTicks(mn,mx,4);
+  const l=40,r=14,t=12,b=24,t0=trPts[0].t,t1=trPts[trPts.length-1].t,span=Math.max(864e5,t1-t0);
+  const X=tt=>trPts.length===1?l+(w-l-r)/2:l+(tt-t0)/span*(w-l-r),Y=v=>t+(1-(v-tk.lo)/(tk.hi-tk.lo||1))*(h-t-b);
+  x.globalAlpha=.13;x.fillStyle=good;x.fillRect(l,Y(M.band[1]),w-l-r,Y(M.band[0])-Y(M.band[1]));x.globalAlpha=1;
+  x.font='11px "Inter", system-ui, sans-serif';x.textBaseline='middle';x.textAlign='right';
+  tk.t.forEach(v=>{x.strokeStyle=line;x.lineWidth=1;x.beginPath();x.moveTo(l,Math.round(Y(v))+.5);x.lineTo(w-r,Math.round(Y(v))+.5);x.stroke();x.fillStyle=muted;x.fillText(v,l-6,Y(v))});
+  x.textAlign='center';x.textBaseline='top';x.fillStyle=muted;
+  const md=p=>{const d=new Date(p.t);return `${d.getMonth()+1}/${d.getDate()}`};
+  const lab=[trPts[0],trPts[trPts.length-1]];if(trPts.length>4)lab.splice(1,0,trPts[Math.floor(trPts.length/2)]);
+  [...new Set(lab)].forEach(p=>x.fillText(md(p),X(p.t),h-b+6));
+  x.strokeStyle=c1;x.lineWidth=2;x.lineJoin='round';x.beginPath();trPts.forEach((p,i)=>{i?x.lineTo(X(p.t),Y(p.v)):x.moveTo(X(p.t),Y(p.v))});x.stroke();
+  trPts.forEach((p,i)=>{const last=i===trPts.length-1;x.fillStyle=c1;x.strokeStyle=surf;x.lineWidth=2;x.beginPath();x.arc(X(p.t),Y(p.v),last?5.5:4,0,7);x.fill();x.stroke();p.px=X(p.t);p.py=Y(p.v)});
+  const lp=trPts[trPts.length-1];x.fillStyle=ink;x.font='600 12px "Inter", system-ui, sans-serif';x.textAlign=lp.px>w-70?'right':'left';x.textBaseline='bottom';
+  x.fillText(`${lp.v.toFixed(M.d)}${M.unit}`,lp.px+(x.textAlign==='right'?-8:8),lp.py-6);
+}
+{const cv=$('trCv'),tip=cv.parentElement.querySelector('.tip');
+  const near=ev=>{const rc=cv.getBoundingClientRect(),mx=ev.clientX-rc.left;let best=null,bd=1e9;trPts.forEach(p=>{const d=Math.abs(p.px-mx);if(d<bd){bd=d;best=p}});return bd<40?best:null};
+  cv.addEventListener('pointermove',ev=>{const p=near(ev);if(!p){tip.hidden=true;return}const M=TR[$('trMetric').value];
+    tip.hidden=false;tip.style.left=clamp(p.px,70,cv.clientWidth-70)+'px';tip.style.top=(cv.offsetTop+Math.max(8,p.py-6))+'px';
+    tip.innerHTML=`${fmtDate(p.r.date).main}　<b>${p.v.toFixed(M.d)}</b>${M.unit}<br><small>タップでこのスイングを開く</small>`});
+  cv.addEventListener('pointerleave',()=>{tip.hidden=true});
+  cv.addEventListener('click',async ev=>{const p=near(ev);if(!p)return;try{await openRecordMain(p.r);location.hash='#analyze'}catch(e){toast(e.message||'開けませんでした。')}});
+  $('trMetric').addEventListener('change',()=>drawTrend());window.addEventListener('resize',()=>{if(curView==='history')drawTrend()});}
 async function renderHistory(){
   let list=null;try{list=await hAll()}catch(e){}
   posterUrls.forEach(u=>URL.revokeObjectURL(u));posterUrls=[];
@@ -1515,6 +1568,7 @@ async function renderHistory(){
       if(histSel){const k=histSel.indexOf(id);if(k>=0)histSel.splice(k,1);else if(histSel.length<2)histSel.push(id);updCmpBar();card.classList.toggle('sel',histSel.includes(id));return}
       try{await openRecordMain(rec);location.hash='#analyze'}catch(e){console.error(e);toast(e.message||'開けませんでした。')}};
     card.querySelector('.hc-more').onclick=()=>openHEdit(rec)});
+  $('trend').hidden=list.length<1;if(list.length)drawTrend(list);
   try{const e=await navigator.storage.estimate();$('histUsage').textContent=`${list.length}件・約${Math.round((e.usage||0)/1e6)}MB使用`}catch(e){$('histUsage').textContent=`${list.length}件`}
 }
 const alertMsg=t=>{$('cmpCount').textContent=t};
