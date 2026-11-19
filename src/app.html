@@ -1152,7 +1152,7 @@ async function detectVideo(file,v,prog,alive,cfg=mainCfg(),noTrim=false){
       if(k%4===0)prog(`スイングの位置を探しています… <b>${Math.round(k/cn*100)}%</b>`,0.2+0.15*k/cn);
     }
     try{const tmp={frames:cf};tmp.frames=prepare(cf,tmp);analyze(tmp,cfg);
-      if(tmp.A.valid){const F=tmp.frames,P=tmp.A.P,sl=cfg.slow||1;tA=Math.max(0,F[P[1]].t-1.0*sl);tB=Math.min(dur,F[P[10]].t+1.2*sl)}}catch(e){console.warn('swing search failed; analysing the whole video',e)}
+      if(tmp.A.valid){const F=tmp.frames,P=tmp.A.P,sl=cfg.slow||1;tA=Math.max(0,F[P[1]].t-2.0*sl);tB=Math.min(dur,F[P[10]].t+1.5*sl)} /* generous margins: the quick pass can place address late */}catch(e){console.warn('swing search failed; analysing the whole video',e)}
   }
   const seg=tB-tA;
   const thumbs=[];let nextThumb=tA;
