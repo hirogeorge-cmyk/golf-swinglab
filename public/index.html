@@ -413,7 +413,7 @@ td.num{font-weight:600;letter-spacing:-.01em}
     <span class="drop-title">スイング動画をアップロード</span>
     <span class="drop-sub">ここに動画をドロップ、またはタップして選択</span>
     <span class="btn primary drop-btn">動画を選ぶ</span>
-    <span class="drop-meta">MP4・MOV ／ 15秒以内 ／ 動画は端末の外に送信されません</span>
+    <span class="drop-meta">MP4・MOV ／ 30秒以内（スイング部分を自動で切り出します） ／ 動画は端末の外に送信されません</span>
   </label>
   <div class="upload-side">
     <h2>選ぶ前に確認</h2>
@@ -973,7 +973,7 @@ const mainRange=()=>{const F=S.frames,ph=S.A.P,sl=S.cfg.slow;return [F[nearest(F
 bindStrip($('mainStrip'),mainRange,t=>{if(!S.A)return;stop();seek(nearest(t))});
 function renderFrame(){
   drawOverlay();drawCharts();{const [a,b]=mainRange();drawStrip($('mainStrip'),S,a,b,S.frames[S.i].t)}
-  $('scrub').value=S.i;$('time').textContent=(S.frames[S.i].t/(+$('slow').value)).toFixed(2)+' s';
+  $('scrub').value=S.i;$('time').textContent=((S.frames[S.i].t-S.frames[0].t)/(+$('slow').value)).toFixed(2)+' s';
   const P=S.A.P;let cur=null;for(const k of [1,4,7,10]) if(S.i>=P[k])cur=k;
   $('phases').querySelectorAll('.phase').forEach((b,j)=>b.classList.toggle('on',[1,4,7,10][j]===cur));
 }
@@ -1081,14 +1081,14 @@ async function rtmInfer(R,src,bx){
   return kp;
 }
 let lmTs=0;
-async function detectVideo(file,v,prog,alive){
+async function detectVideo(file,v,prog,alive,cfg=mainCfg()){
   let lm=await getLandmarker(prog);
   let rtm=null;if($('hq').value==='1'){try{rtm=await getRTM(prog)}catch(e){console.warn('RTMPose unavailable, using MediaPipe only',e)}}
   prog('動画を読み込み中…',0.2);
   await loadVideoFile(v,file);
   // some phones create the GPU engine but fail on the first frame: fall back to the CPU engine
   try{lmTs+=17;lm.detectForVideo(v,lmTs)}catch(e){console.warn('GPU detect failed, using CPU',e);landmarkerP=null;lm=await getLandmarker(prog,true)}
-  const dur=Math.min(v.duration||0,15);
+  const dur=Math.min(v.duration||0,30);
   if(!dur)throw new Error('動画の長さを取得できませんでした。');
   const W=v.videoWidth,H=v.videoHeight;
   const toFrame=(t,r)=>{const L=r.landmarks&&r.landmarks[0], Wl=r.worldLandmarks&&r.worldLandmarks[0];
@@ -1097,11 +1097,26 @@ async function detectVideo(file,v,prog,alive){
   // (requestVideoFrameCallback). Seeks are not frame-accurate in every browser/codec; repeated
   // frames are skipped so they can't fake a sudden jump in hand speed.
   const rvfc='requestVideoFrameCallback' in HTMLVideoElement.prototype;
-  const thumbs=[];let nextThumb=0;
-  const frames=[];const fps=dur<=6?60:FPS;const n=Math.floor(dur*fps);let lastMT=-1;
+  // Pass 1 (quick, 10 frames/s, light engine only): find where the swing is, so the time spent
+  // waiting before address or watching the ball after the finish is left out of the detailed pass.
+  let tA=0,tB=dur;
+  if(dur>4.5){
+    const cf=[],cn=Math.floor(dur*10);
+    for(let k=0;k<=cn;k++){
+      if(!alive())return null;
+      const t=Math.min(k/10,v.duration-0.001);v.currentTime=t;try{await waitEv(v,'seeked',3000,'seek')}catch(e){continue}
+      lmTs+=17;cf.push(toFrame(t,lm.detectForVideo(v,lmTs)));
+      if(k%4===0)prog(`スイングの位置を探しています… <b>${Math.round(k/cn*100)}%</b>`,0.2+0.15*k/cn);
+    }
+    try{const tmp={frames:cf};tmp.frames=prepare(cf,tmp);analyze(tmp,cfg);
+      if(tmp.A.valid){const F=tmp.frames,P=tmp.A.P,sl=cfg.slow||1;tA=Math.max(0,F[P[1]].t-1.0*sl);tB=Math.min(dur,F[P[10]].t+1.2*sl)}}catch(e){console.warn('swing search failed; analysing the whole video',e)}
+  }
+  const seg=tB-tA;
+  const thumbs=[];let nextThumb=tA;
+  const frames=[];const fps=seg<=6?60:FPS;const n=Math.floor(seg*fps);let lastMT=-1;
   for(let k=0;k<=n;k++){
     if(!alive())return null;
-    const t=Math.min(k/fps,v.duration-0.001);
+    const t=Math.min(tA+k/fps,v.duration-0.001);
     const shown=rvfc?new Promise(res=>v.requestVideoFrameCallback((now,md)=>res(md.mediaTime))):null;
     v.currentTime=t;try{await waitEv(v,'seeked',3000,'seek')}catch(e){continue}
     let mt=t;
@@ -1112,10 +1127,10 @@ async function detectVideo(file,v,prog,alive){
       const kp=await rtmInfer(rtm,v,[x1-0.05*h,y1-0.12*h,x2+0.05*h,y2+0.03*h]);
       COCO2MP.forEach((mi,ci)=>{if(kp[ci][2]>0.3)fr.p[mi]=[kp[ci][0],kp[ci][1],1]});fr.rtm=true}catch(e){console.warn(e)}}
     frames.push(fr);
-    if(mt>=nextThumb){thumbs.push({t:mt,c:grabThumb(v,W,H)});nextThumb=mt+dur/THUMBS}
+    if(mt>=nextThumb){thumbs.push({t:mt,c:grabThumb(v,W,H)});nextThumb=mt+seg/THUMBS}
     if(k%3===0)prog(`骨格を検出中${rtm?'（高精度）':''}… <b>${Math.round(k/n*100)}%</b><br><small>${k} / ${n} コマ</small>`,0.2+0.8*k/n);
   }
-  return {frames,W,H,dur,full:v.duration,thumbs,rtm:frames.some(f=>f.rtm)};
+  return {frames,W,H,dur:seg,full:v.duration,trimmed:seg<Math.min(v.duration,30)-0.3,thumbs,rtm:frames.some(f=>f.rtm)};
 }
 let runId=0;
 async function analyzeFile(file){
@@ -1131,7 +1146,7 @@ async function analyzeFile(file){
     if(!S.A.valid)throw new Error('スイングの区間を特定できませんでした。アドレスからフィニッシュまで映っているか確認してください。');
     setMainUI('done');layoutStage();renderPanel();seek(S.A.P[1]);busy(null);onMainChanged();
     $('notice').querySelector('strong').textContent='解析完了';
-    $('noticeText').textContent=`${file.name}（${r.dur.toFixed(1)} 秒${r.full>15?'・先頭15秒のみ':''}）を解析しました。${vmsg}数値は2D映像からの推定値です。撮影方向と利き手が正しいか確認してください。`;
+    $('noticeText').textContent=`${file.name}${r.trimmed?`（${r.full.toFixed(1)} 秒）からスイング部分の ${r.dur.toFixed(1)} 秒を切り出して`:`（${r.dur.toFixed(1)} 秒）を`}解析しました。${r.full>30?'（先頭30秒まで）':''}${vmsg}数値は2D映像からの推定値です。撮影方向と利き手が正しいか確認してください。`;
     {const base=$('noticeText').textContent;
      saveHistory(S,file,p=>{if(my===runId)$('noticeText').textContent=base+` 履歴に保存中… ${Math.round(p*100)}%`}).then(rec=>{if(my!==runId)return;
        $('noticeText').textContent=base+(rec?` ${fmtDate(rec.date).main} の履歴に保存しました${rec.lite?`（約${Math.max(0.1,rec.bytes/1e6).toFixed(1)}MB${rec.origBytes?`・元の動画は約${Math.round(rec.origBytes/1e6)}MB`:''}）`:''}。`:' 履歴に保存できませんでした。');setCmpLabels()})}
@@ -1282,7 +1297,7 @@ function renderCmp(){
 }
 let mRun=0;
 $('mFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!isVideoFile(file))return;const my=++mRun;cm.stop();
-  try{const r=await detectVideo(file,M.video,(t,p)=>busy(t,p,'busyM'),()=>my===mRun);if(!r)return;
+  try{const r=await detectVideo(file,M.video,(t,p)=>busy(t,p,'busyM'),()=>my===mRun,mCfg());if(!r)return;
     M.label='';M.histId=null;M.thumbs=r.thumbs;M.rtm=r.rtm;M.W=r.W;M.H=r.H;M.source='video';M.name=file.name;M.frames=prepare(r.frames,M);analyze(M,mCfg());if(M.A.valid)autoView(M,'mView',mCfg);
     if(!M.A.valid)throw new Error('お手本動画のスイング区間を特定できませんでした。アドレスからフィニッシュまで映っている動画を選んでください。');
     busy(null,0,'busyM');
