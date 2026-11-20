@@ -41,6 +41,6 @@
 - 送るもの：参加後に解析して履歴に保存した動画（切り出し部分）＋ JSON（骨格・解析結果・設定・名前）。マーカーを修正したら修正分の JSON も追加で送る。メモは送らない。参加前の履歴も送らない
 - 画面：解析中に「モニター参加中・動画を提供しています」と「この動画は提供しない」、終わったら「提供しました」。履歴カードに「提供済み」。失敗分は次に開いたとき再送
 - 受付：Google Apps Script のウェブアプリ（`tools/monitor-apps-script.gs`）。保存先はマイドライブ / SwingLab_モニター / 名前 /。作成のみで、読み取り・削除の機能はない
-- 設定：`src/app.html` の `const MONITOR={on:true,url:''...}` の url に Apps Script の /exec の URL を入れる（空だと「準備中」と表示されて参加できない）
+- 設定：`src/app.html` の `const MONITOR={on:true,url:'...'}` に Apps Script の /exec の URL（2026-11-20 設定済み。空にすると「準備中」になり参加できない）
 - 消すとき：`MONITOR.on=false` で全部非表示。完全に消すなら `MONITOR START` 〜 `MONITOR END` のブロックと monXxx() の呼び出し、monSheet・monField・monBadge の HTML を削除
 - 一般公開するときは「最初は送らない・本人が選んだら送る」方式に変える（App Store の審査も考慮）

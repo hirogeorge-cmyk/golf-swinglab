@@ -1693,7 +1693,7 @@ setMemoUI();
    Dev-phase data donation. Participants agree once; after that every swing they analyse and save to history is
    sent (video + keypoints, no memo) to the developer's Google Drive through an Apps Script web app.
    To remove the feature: set MONITOR.on=false (hides everything), or delete this block and the monXxx() calls. */
-const MONITOR={on:true,url:'',chunk:5*1024*1024};
+const MONITOR={on:true,url:'https://script.google.com/macros/s/AKfycbwFZwmF3CoymzY3XBJBvEDINyD9WRdFebrHWE0GW2QlivJAv1goSHDnTiJPw-HzLM9O/exec',chunk:5*1024*1024};
 const MON_KEY='swinglab.monitor';
 const monGet=()=>{try{return JSON.parse(localStorage.getItem(MON_KEY)||'null')}catch(e){return null}};
 const monSet=v=>{try{v?localStorage.setItem(MON_KEY,JSON.stringify(v)):localStorage.removeItem(MON_KEY)}catch(e){}};
