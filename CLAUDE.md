@@ -44,3 +44,10 @@
 - 設定：`src/app.html` の `const MONITOR={on:true,url:'...'}` に Apps Script の /exec の URL（2026-11-20 設定済み。空にすると「準備中」になり参加できない）
 - 消すとき：`MONITOR.on=false` で全部非表示。完全に消すなら `MONITOR START` 〜 `MONITOR END` のブロックと monXxx() の呼び出し、monSheet・monField・monBadge の HTML を削除
 - 一般公開するときは「最初は送らない・本人が選んだら送る」方式に変える（App Store の審査も考慮）
+
+## 長い練習動画の切り出し（Mac で使う AI 学習用ツール）
+- `tools/split_swings.py`：1本の長い動画（何回もスイングしている）から、スイングを1回ずつ見つけて切り出す
+  - 出力：動画の隣に「<名前>_切り出し」フォルダ。swing_01.mp4 + swing_01.json（モニターと同じ JSON 形式）…、一覧.jpg（各スイングのトップ。失敗した切り出しを目で見て消す）
+  - フォルダを渡すと、未処理の動画をまとめて処理。スロー撮影は `--slow 4` など
+  - 必要：`pip install mediapipe opencv-python onnxruntime rtmlib numpy`、あれば ffmpeg（なければ OpenCV で書き出し）。モデルは public/model から自動で組み立てる（tools/.cache）
+- ユーザーは Mac の「ゴルフAI学習」フォルダに元動画を溜める。クラウドのセッションからは Mac のフォルダを使えなかった（2026-11-20 時点・機能が未提供）ので、Mac 上の Claude Code セッションでこのツールを動かす
