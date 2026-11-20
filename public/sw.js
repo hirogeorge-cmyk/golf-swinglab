@@ -1,5 +1,5 @@
 // Offline support: cache the heavy engine files once, keep the page itself fresh.
-const CACHE = 'swinglab-v38';
+const CACHE = 'swinglab-v39';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
   'vendor/vision_bundle.mjs', 'vendor/vision_wasm_internal.js', 'vendor/mp4-muxer.js', 'vendor/ort.webgpu.min.js', 'vendor/ort-wasm-simd-threaded.jsep.mjs',
   'ort/jsep.0.wasm', 'ort/jsep.1.wasm', 'model/rtm.0.wasm', 'model/rtm.1.wasm', 'model/rtm.2.wasm', 'model/rtm.3.wasm',
@@ -10,7 +10,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).then(r => { const cp = r.clone(); caches.open(CACHE).then(c => c.put('index.html', cp)); return r; }).catch(() => caches.match('index.html')));
+    e.respondWith(fetch(e.request, { cache: 'no-cache' }).then(r => { const cp = r.clone(); caches.open(CACHE).then(c => c.put('index.html', cp)); return r; }).catch(() => caches.match('index.html')));
     return;
   }
   e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request)));
