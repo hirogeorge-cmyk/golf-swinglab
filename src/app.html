@@ -146,8 +146,8 @@ td .ref{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-bo
 .hc-main img,.hc-ph{width:66px;height:88px;object-fit:cover;border-radius:8px;background:var(--stage);flex:none}
 .hc-ph{display:block;background:radial-gradient(circle at 50% 70%,rgba(201,168,106,.35) 0 7px,transparent 8px),var(--stage)}
 .hc-body{min-width:0;display:flex;flex-direction:column;gap:3px}
-.hc-date{font-family:var(--f-display);font-weight:700;font-size:20px;line-height:1.1}
-.hc-date small{font-family:var(--f-body);font-size:12px;font-weight:500;color:var(--muted);margin-left:4px}
+.hc-date{font-family:var(--f-display);font-weight:700;font-size:clamp(17px,5vw,20px);line-height:1.1;white-space:nowrap}
+.hc-date small{font-family:var(--f-body);font-size:12px;font-weight:500;color:var(--muted);margin-left:2px}
 .hc-meta{font-size:12px;color:var(--muted)}
 .hc-stats{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12.5px;color:var(--muted)}
 .hc-stats b{font-family:var(--f-display);font-size:16px;color:var(--ink);font-weight:700}
@@ -513,7 +513,7 @@ td.num{font-weight:600;letter-spacing:-.01em}
 </div>
 <div id="view-history" class="view" hidden>
   <div class="hist-head"><h2>スイングの履歴</h2><span class="hist-usage" id="histUsage"></span></div>
-  <p class="intro">解析した動画は、日付と一緒にこの端末の中だけに保存されます（外部には送信されません）。2本を選ぶと、並べて比較できます。</p>
+  <p class="intro">解析した動画は、日付と一緒にこの端末の中だけに保存されます<span id="histPriv">（外部には送信されません）</span>。2本を選ぶと、並べて比較できます。</p>
   <div class="notice hist-warn" id="histWarn" hidden><strong>ご注意</strong><span>この画面（Claudeアプリなどの中）では、アプリを閉じると履歴が消えることがあります。履歴を残すには、公開サイト <a href="https://hirogeorge-cmyk.github.io/golf-swinglab/" target="_blank" rel="noopener">hirogeorge-cmyk.github.io/golf-swinglab</a> をSafariで開き、「ホーム画面に追加」してお使いください。</span></div>
   <div class="hist-actions"><button class="btn primary" id="histCmpBtn">2本を選んで比較する</button><button class="btn" id="histShrink" hidden>古い履歴の容量を減らす</button><span class="export-msg" id="shrinkMsg" role="status"></span></div>
   <div class="empty" id="histEmpty" hidden><p>まだ履歴がありません。「解析」タブで動画を選ぶと、ここに自動で保存されます。</p><a class="btn primary" href="#analyze">動画を選ぶ</a></div>
@@ -1683,7 +1683,7 @@ const monGet=()=>{try{return JSON.parse(localStorage.getItem(MON_KEY)||'null')}c
 const monSet=v=>{try{v?localStorage.setItem(MON_KEY,JSON.stringify(v)):localStorage.removeItem(MON_KEY)}catch(e){}};
 const monOn=()=>!!(MONITOR.on&&MONITOR.url&&monGet());
 let monSkipRun=-1;
-function monUI(){const f=$('monField');if(!f)return;f.hidden=!MONITOR.on;if(!MONITOR.on)return;const m=monGet(),b=$('monBtn');b.dataset.armed='';
+function monUI(){const f=$('monField');if(!f)return;$('histPriv').textContent=monOn()?'（モニター参加中のため、解析した動画は開発者に提供されます）':'（外部には送信されません）';f.hidden=!MONITOR.on;if(!MONITOR.on)return;const m=monGet(),b=$('monBtn');b.dataset.armed='';
   if(!MONITOR.url){$('monStatus').textContent='準備中です（受付の設定が終わると参加できます）。';b.textContent='参加する';b.disabled=true;return}
   b.disabled=false;
   if(m){const d=new Date(m.at);$('monStatus').textContent=`参加中（${m.name}さん・${d.getMonth()+1}月${d.getDate()}日に同意）。解析して履歴に保存した動画は、自動で開発者に提供されます。`;b.textContent='モニターをやめる'}
@@ -1725,8 +1725,8 @@ async function monAfterSave(rec,run,base){
   await hPatch(rec.id,{mon:{state:'pending'}}).catch(()=>{});
   const say=t=>{if(run===runId)$('noticeText').textContent=base+t};
   say(' 提供中…');
-  try{await monQueue(rec,p=>say(` 提供中… ${Math.round(p*100)}%`));say(' 提供しました。');renderHistory()}
-  catch(e){console.warn('monitor send failed',e);say(' 提供できませんでした（次にアプリを開いたときに送り直します）。')}}
+  try{await monQueue(rec,p=>say(` 提供中… ${Math.round(p*100)}%`));say(' 提供しました。');toast('動画を提供しました。');renderHistory()}
+  catch(e){console.warn('monitor send failed',e);say(' 提供できませんでした（次にアプリを開いたときに送り直します）。');toast('提供できませんでした。次に開いたときに送り直します。')}}
 // marker corrections on a swing that was already provided -> send them as an extra file
 async function monAfterEdit(){
   try{if(!monOn()||!S.histId||!S.edits||!Object.keys(S.edits).length||!S.monSpace)return;
